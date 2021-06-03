@@ -8,6 +8,7 @@ add_executable(${EXECUTABLE}
   math.f90
   constants.f90
   electronic_system.f90
+  electron_dynamics.f90
   )
 
 

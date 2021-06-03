@@ -8,7 +8,7 @@ program main
   call init_inputoutput
   write(*,*)'myrank=',comm_id_global
 
-  call init_elec_system
+  call calc_electron_dynamics
 
   call fin_inputoutput
   call fin_parallel
