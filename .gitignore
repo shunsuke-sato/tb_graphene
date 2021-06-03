@@ -11,11 +11,23 @@
 *.mod
 
 # Executable files
-test
+tb_gra
 
 # Libraries
 *.lib
 *.a
 *.la
 *.lo
+
+
+### CMake ###
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
 
