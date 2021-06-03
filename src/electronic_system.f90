@@ -29,11 +29,14 @@ module electronic_system
   real(8) :: mu_F, mu_F_ev
   real(8) :: kbT, kbT_K
 
+
+  real(8),allocatable :: eps_dist(:,:),occ_dist(:,:)
   contains
 !-------------------------------------------------------------------------------
     subroutine init_elec_system
       implicit none
       integer :: ik1, ik2, ik
+      integer :: id_file
 
 ! set prameters
 
@@ -95,7 +98,8 @@ module electronic_system
       allocate(kx(nk),ky(nk))
       allocate(kx0(nk),ky0(nk))    
       allocate(zrho_dm(2,2,nk_start:nk_end))
-      allocate(ik_table(0:nk1-1,nk2-1))
+      allocate(ik_table(0:nk1-1,0:nk2-1))
+      allocate(eps_dist(2,nk),occ_dist(2,nk))
       
       ! initialize k-grids
       ik = 0
@@ -115,6 +119,21 @@ module electronic_system
       ky = ky0
 
       call initialize_density_matrix
+      if(if_root_global)then
+        call get_newfile_id(id_file)
+        open(id_file, file='electronic_structure.out')
+        do ik1 = 0, nk1-1
+          do ik2 = 1, nk2-1
+            write(id_file,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
+                                         ,ky(ik_table(ik1,ik2)) &
+                                         ,eps_dist(:,ik_table(ik1,ik2)) &
+                                         ,occ_dist(:,ik_table(ik1,ik2))
+          end do
+          write(id_file,*)
+        end do
+        close(id_file)
+      end if
+
       
     end subroutine init_elec_system
 !-------------------------------------------------------------------------------
@@ -122,16 +141,20 @@ module electronic_system
       implicit none
       integer :: ik
       real(8) :: kx_t, ky_t
-      complex(8) :: zfk_t
+      complex(8) :: zfk_t, zalpha
       complex(8) :: zeigv(2,2)
       real(8) :: eig(2), occ(2)
+
+      eps_dist = 0d0
+      occ_dist = 0d0
 
       do ik = nk_start, nk_end
         kx_t = kx(ik)
         ky_t = ky(ik)
 
         zfk_t = zfk_tb(kx_t, ky_t)
-        call calc_eigv_2x2_gra(zfk_t, zeigv, eig)
+        zalpha = -t_hop*zfk_t
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
         occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
         occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
 
@@ -146,7 +169,14 @@ module electronic_system
 
         zrho_dm(1,2, ik) = conjg(zrho_dm(2,1, ik))
 
+
+        eps_dist(:,ik) = eig(:)
+        occ_dist(:,ik) = occ(:)
+
       end do
+
+      call comm_allreduce(eps_dist)
+      call comm_allreduce(occ_dist)
 
     end subroutine initialize_density_matrix
 !-------------------------------------------------------------------------------

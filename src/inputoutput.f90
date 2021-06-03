@@ -18,7 +18,8 @@ module inputoutput
             read_basic_input, &
             read_vector_input, &
             read_matrix_input, &
-            fin_inputoutput
+            fin_inputoutput, &
+            get_newfile_id
 
 
   interface read_basic_input
@@ -348,6 +349,14 @@ contains
 
   end subroutine lookup_input
 
+!-------------------------------------------------------------------------------
+  subroutine get_newfile_id(id_out)
+    implicit none
+    integer,intent(out) :: id_out
 
+    id_outputfile_sequential = id_outputfile_sequential +1
+    id_out = id_outputfile_sequential
+    
+  end subroutine get_newfile_id
 !-------------------------------------------------------------------------------
 end module inputoutput
