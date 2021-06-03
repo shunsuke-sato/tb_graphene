@@ -4,6 +4,7 @@ add_executable(${EXECUTABLE}
   main.f90
   parallel.f90
   communication.f90
+  inputoutput.f90
   )
 
 
