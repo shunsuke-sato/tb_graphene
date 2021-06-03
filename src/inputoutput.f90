@@ -48,7 +48,7 @@ contains
       open(id_input_log,file=name_input_log)
     end if
 
-    sequential = 20
+    id_outputfile_sequential = 20
 
   end subroutine init_inputoutput
 !-------------------------------------------------------------------------------

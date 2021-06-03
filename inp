@@ -1,0 +1,9 @@
+nkx = 2
+nky = 2
+
+T1_relax_fs = 100d0
+T2_relax_fs = 20d0
+
+mu_F_ev = 0d0
+kbT_K = 300d0
+

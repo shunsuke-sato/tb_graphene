@@ -6,6 +6,8 @@ add_executable(${EXECUTABLE}
   communication.f90
   inputoutput.f90
   math.f90
+  constants.f90
+  electronic_system.f90
   )
 
 
