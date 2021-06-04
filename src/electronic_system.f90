@@ -7,7 +7,10 @@ module electronic_system
   implicit none
   private
 
-  public :: init_elec_system
+  public :: init_elec_system &
+           ,calc_commutator_2x2_gra_density_matrix &
+           ,calc_eigv_2x2_gra &
+           ,zfk_tb
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
 
@@ -16,18 +19,18 @@ module electronic_system
   real(8) :: a_l(2,2), b_l(2,2)
 
 ! nearest-enighbor vectors and hopping
-  real(8) :: delta_l(2,3), t_hop
+  real(8),public :: delta_l(2,3), t_hop
 
 ! k-grids
-  integer :: nk1, nk2, nk, nk_start, nk_end, nk_average, nk_remainder
-  real(8),allocatable :: kx0(:),ky0(:),kx(:),ky(:)
-  integer,allocatable :: ik_table(:,:)
+  integer,public :: nk1, nk2, nk, nk_start, nk_end, nk_average, nk_remainder
+  real(8),allocatable,public :: kx0(:),ky0(:),kx(:),ky(:)
+  integer,allocatable,public :: ik_table(:,:)
 
 ! density matrix
-  complex(8),allocatable :: zrho_dm(:,:,:)
-  real(8) :: t1_relax, t2_relax, t1_relax_fs, t2_relax_fs
-  real(8) :: mu_F, mu_F_ev
-  real(8) :: kbT, kbT_K
+  complex(8),allocatable,public :: zrho_dm(:,:,:)
+  real(8),public :: t1_relax, t2_relax, t1_relax_fs, t2_relax_fs
+  real(8),public :: mu_F, mu_F_ev
+  real(8),public :: kbT, kbT_K
 
 
   real(8),allocatable :: eps_dist(:,:),occ_dist(:,:)
@@ -228,7 +231,7 @@ module electronic_system
     subroutine calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zcomm_out)
       implicit none
       complex(8),intent(in) :: zalpha, zdrho_dm_t(2,2)
-      complex(8),intent(out) :: zcomm_out
+      complex(8),intent(out) :: zcomm_out(2,2)
       real(8) :: rho22_rho11
       complex(8) :: zs
 
@@ -236,8 +239,8 @@ module electronic_system
       rho22_rho11 = zdrho_dm_t(2,2)-zdrho_dm_t(1,1)
 
       zcomm_out(1,1) = zs
-      zcomm_out(2,1) = -conjg(zalpha)*rho_22_rho_11
-      zcomm_out(1,2) = zalpha*rho_22_rho_11
+      zcomm_out(2,1) = -conjg(zalpha)*rho22_rho11
+      zcomm_out(1,2) = zalpha*rho22_rho11
       zcomm_out(2,2) = -zs
 
 

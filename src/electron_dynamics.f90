@@ -4,6 +4,7 @@ module electron_dynamics
   use inputoutput
   use electronic_system
   use laser
+  use math
   use constants
   implicit none
   private
@@ -77,9 +78,10 @@ module electron_dynamics
         call calc_vector_potential_time(tt, Act_x, Act_y)
         kx_t = kx0(ik) + Act_x
         ky_t = ky0(ik) + Act_y
+        zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
-        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
-        zLrho_dm = -zi*zLrho_dm
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zrho_dm_t, zLrho_dm_t)
+        zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
         occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
@@ -94,7 +96,7 @@ module electron_dynamics
 ! transform back to site basis
         zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
 
-        zrho_dm_RK4(:,:,1) = zLrho_dm + zrho_col
+        zrho_dm_RK4(:,:,1) = zLrho_dm_t + zrho_col
 ! RK2
         tt = it*time_step +0.5d0*time_step
         zrho_dm_t(:,:) = zrho_dm(:,:,ik) + zrho_dm_RK4(:,:,1)*0.5d0*time_step
@@ -102,9 +104,10 @@ module electron_dynamics
         call calc_vector_potential_time(tt, Act_x, Act_y)
         kx_t = kx0(ik) + Act_x
         ky_t = ky0(ik) + Act_y
+        zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
-        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
-        zLrho_dm = -zi*zLrho_dm
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zrho_dm_t, zLrho_dm_t)
+        zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
         occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
@@ -118,7 +121,7 @@ module electron_dynamics
 ! transform back to site basis
         zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
 
-        zrho_dm_RK4(:,:,2) = zLrho_dm + zrho_col
+        zrho_dm_RK4(:,:,2) = zLrho_dm_t + zrho_col
 
 ! RK3
         tt = it*time_step +0.5d0*time_step
@@ -127,9 +130,10 @@ module electron_dynamics
         call calc_vector_potential_time(tt, Act_x, Act_y)
         kx_t = kx0(ik) + Act_x
         ky_t = ky0(ik) + Act_y
+        zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
-        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
-        zLrho_dm = -zi*zLrho_dm
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zrho_dm_t, zLrho_dm_t)
+        zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
         occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
@@ -143,7 +147,7 @@ module electron_dynamics
 ! transform back to site basis
         zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
 
-        zrho_dm_RK4(:,:,3) = zLrho_dm + zrho_col
+        zrho_dm_RK4(:,:,3) = zLrho_dm_t + zrho_col
 
 ! RK3
         tt = it*time_step + time_step
@@ -152,9 +156,10 @@ module electron_dynamics
         call calc_vector_potential_time(tt, Act_x, Act_y)
         kx_t = kx0(ik) + Act_x
         ky_t = ky0(ik) + Act_y
+        zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
-        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
-        zLrho_dm = -zi*zLrho_dm
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zrho_dm_t, zLrho_dm_t)
+        zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
         occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
@@ -168,7 +173,7 @@ module electron_dynamics
 ! transform back to site basis
         zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
 
-        zrho_dm_RK4(:,:,4) = zLrho_dm + zrho_col
+        zrho_dm_RK4(:,:,4) = zLrho_dm_t + zrho_col
 
 ! RK final
         zrho_dm(:,:,ik) = zrho_dm(:,:,ik) + time_step/6d0*(&
