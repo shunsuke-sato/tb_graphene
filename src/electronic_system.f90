@@ -222,6 +222,27 @@ module electronic_system
 
     end function zfk_tb
 !-------------------------------------------------------------------------------
+! diagonalize a special matrix
+! H = ( 0,       za),  compute [H, rho]
+!     (conjg(za), 0)
+    subroutine calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zcomm_out)
+      implicit none
+      complex(8),intent(in) :: zalpha, zdrho_dm_t(2,2)
+      complex(8),intent(out) :: zcomm_out
+      real(8) :: rho22_rho11
+      complex(8) :: zs
+
+      zs = zalpha*zdrho_dm_t(2,1)-conjg(zalpha)*zdrho_dm_t(1,2)
+      rho22_rho11 = zdrho_dm_t(2,2)-zdrho_dm_t(1,1)
+
+      zcomm_out(1,1) = zs
+      zcomm_out(2,1) = -conjg(zalpha)*rho_22_rho_11
+      zcomm_out(1,2) = zalpha*rho_22_rho_11
+      zcomm_out(2,2) = -zs
+
+
+    end subroutine calc_commutator_2x2_gra_density_matrix
+!-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------

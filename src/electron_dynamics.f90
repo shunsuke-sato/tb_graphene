@@ -26,6 +26,8 @@ module electron_dynamics
 
       do it = 0, num_time_step
 
+        call dt_evolve_elec(it)
+
       end do
 
     end subroutine calc_electron_dynamics
@@ -54,6 +56,129 @@ module electron_dynamics
 
     end subroutine init_electron_dynamics
 !-------------------------------------------------------------------------------
+! propagate dnesity matrix with RK4
+    subroutine dt_evolve_elec(it)
+      implicit none
+      integer,intent(in) :: it
+      integer :: ik
+      real(8) :: tt, Act_x, Act_y
+      complex(8) :: zrho_dm_t(2,2), zrho_dm_RK4(2,2,4)
+      complex(8) :: zLrho_dm_t(2,2), zrho_col(2,2)
+      real(8) :: kx_t, ky_t
+      complex(8) :: zfk_t, zalpha
+      complex(8) :: zeigv(2,2)
+      real(8) :: eig(2), occ(2)
+
+      do ik = nk_start, nk_end
+! RK1
+        tt = it*time_step
+        zrho_dm_t(:,:) = zrho_dm(:,:,ik)
+
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        kx_t = kx0(ik) + Act_x
+        ky_t = ky0(ik) + Act_y
+        zalpha = -t_hop*zfk_t
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
+        zLrho_dm = -zi*zLrho_dm
+
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+
+! transform to instantaneous eigen basis
+        zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
+        zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
+        zrho_col(1,2) = -zrho_col(1,2)/T2_relax
+        zrho_col(2,1) = -zrho_col(2,1)/T2_relax
+        zrho_col(2,2) = -(zrho_col(2,2)-occ(2))/T1_relax
+! transform back to site basis
+        zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
+
+        zrho_dm_RK4(:,:,1) = zLrho_dm + zrho_col
+! RK2
+        tt = it*time_step +0.5d0*time_step
+        zrho_dm_t(:,:) = zrho_dm(:,:,ik) + zrho_dm_RK4(:,:,1)*0.5d0*time_step
+
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        kx_t = kx0(ik) + Act_x
+        ky_t = ky0(ik) + Act_y
+        zalpha = -t_hop*zfk_t
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
+        zLrho_dm = -zi*zLrho_dm
+
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+! transform to instantaneous eigen basis
+        zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
+        zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
+        zrho_col(1,2) = -zrho_col(1,2)/T2_relax
+        zrho_col(2,1) = -zrho_col(2,1)/T2_relax
+        zrho_col(2,2) = -(zrho_col(2,2)-occ(2))/T1_relax
+! transform back to site basis
+        zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
+
+        zrho_dm_RK4(:,:,2) = zLrho_dm + zrho_col
+
+! RK3
+        tt = it*time_step +0.5d0*time_step
+        zrho_dm_t(:,:) = zrho_dm(:,:,ik) + zrho_dm_RK4(:,:,2)*0.5d0*time_step
+
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        kx_t = kx0(ik) + Act_x
+        ky_t = ky0(ik) + Act_y
+        zalpha = -t_hop*zfk_t
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
+        zLrho_dm = -zi*zLrho_dm
+
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+! transform to instantaneous eigen basis
+        zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
+        zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
+        zrho_col(1,2) = -zrho_col(1,2)/T2_relax
+        zrho_col(2,1) = -zrho_col(2,1)/T2_relax
+        zrho_col(2,2) = -(zrho_col(2,2)-occ(2))/T1_relax
+! transform back to site basis
+        zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
+
+        zrho_dm_RK4(:,:,3) = zLrho_dm + zrho_col
+
+! RK3
+        tt = it*time_step + time_step
+        zrho_dm_t(:,:) = zrho_dm(:,:,ik) + zrho_dm_RK4(:,:,3)*time_step
+
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        kx_t = kx0(ik) + Act_x
+        ky_t = ky0(ik) + Act_y
+        zalpha = -t_hop*zfk_t
+        call calc_commutator_2x2_gra_density_matrix(zalpha, zdrho_dm_t, zLrho_dm)
+        zLrho_dm = -zi*zLrho_dm
+
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+! transform to instantaneous eigen basis
+        zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
+        zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
+        zrho_col(1,2) = -zrho_col(1,2)/T2_relax
+        zrho_col(2,1) = -zrho_col(2,1)/T2_relax
+        zrho_col(2,2) = -(zrho_col(2,2)-occ(2))/T1_relax
+! transform back to site basis
+        zrho_col = matmul(zeigv,  matmul(zrho_col, transpose(conjg(zeigv))))
+
+        zrho_dm_RK4(:,:,4) = zLrho_dm + zrho_col
+
+! RK final
+        zrho_dm(:,:,ik) = zrho_dm(:,:,ik) + time_step/6d0*(&
+          zrho_dm_RK4(:,:,1) + 2d0*zrho_dm_RK4(:,:,2) &
+         +2d0*zrho_dm_RK4(:,:,3) + zrho_dm_RK4(:,:,4))
+
+      end do
+
+
+    end subroutine dt_evolve_elec
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
