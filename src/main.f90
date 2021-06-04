@@ -1,7 +1,7 @@
 program main
   use parallel
   use inputoutput
-  use electronic_system
+  use electron_dynamics
   implicit none
 
   call init_parallel
