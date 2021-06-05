@@ -1,5 +1,5 @@
-nk1 = 64
-nk2 = 64
+nk1 = 4
+nk2 = 4
 
 T1_relax_fs = 100d0
 T2_relax_fs = 20d0

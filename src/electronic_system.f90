@@ -10,7 +10,8 @@ module electronic_system
   public :: init_elec_system &
            ,calc_commutator_2x2_gra_density_matrix &
            ,calc_eigv_2x2_gra &
-           ,zfk_tb
+           ,zfk_tb &
+           ,calc_current_elec_system
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
 
@@ -25,6 +26,7 @@ module electronic_system
   integer,public :: nk1, nk2, nk, nk_start, nk_end, nk_average, nk_remainder
   real(8),allocatable,public :: kx0(:),ky0(:),kx(:),ky(:)
   integer,allocatable,public :: ik_table(:,:)
+  real(8) :: dkxy
 
 ! density matrix
   complex(8),allocatable,public :: zrho_dm(:,:,:)
@@ -56,6 +58,7 @@ module electronic_system
 
       b_l(1,2) = 2d0*pi/(3d0*a0_l)
       b_l(2,2) = -2d0*pi*sqrt(3d0)/(3d0*a0_l)
+
 
       delta_l(1,1) = a0_l/2d0
       delta_l(2,1) = a0_l*sqrt(3d0)/2d0
@@ -103,11 +106,13 @@ module electronic_system
       allocate(zrho_dm(2,2,nk_start:nk_end))
       allocate(ik_table(0:nk1-1,0:nk2-1))
       allocate(eps_dist(2,nk),occ_dist(2,nk))
+
+      dkxy = abs(b_l(1,1)*b_l(2,2)-b_l(2,1)*b_l(1,2))/nk
       
       ! initialize k-grids
       ik = 0
       do ik1 = 0, nk1-1
-        do ik2 = 1, nk2-1
+        do ik2 = 0, nk2-1
           ik = ik + 1
           
           kx0(ik) = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
@@ -183,6 +188,42 @@ module electronic_system
 
     end subroutine initialize_density_matrix
 !-------------------------------------------------------------------------------
+    subroutine calc_current_elec_system(jxy_t)
+      implicit none
+      real(8),intent(out) :: jxy_t(2)
+      complex(8) :: zjx_op(2,2), zjy_op(2,2)
+      complex(8) :: zdfk_dk(2), zmat_tmp(2,2)
+      real(8) :: kx_t, ky_t
+      integer :: ik
+
+      zjx_op = 0d0
+      zjy_op = 0d0
+
+      jxy_t = 0d0
+      do ik = nk_start, nk_end
+        kx_t = kx(ik)
+        ky_t = ky(ik)
+
+        zdfk_dk(:) = zdfk_dk_tb(kx_t, ky_t)
+        zjx_op(1,2) = t_hop*zdfk_dk(1) ! *(-1)*(-1)
+        zjx_op(2,1) = conjg(zjx_op(2,1))
+
+        zjy_op(1,2) = t_hop*zdfk_dk(2) ! *(-1)*(-1)
+        zjy_op(2,1) = conjg(zjy_op(2,1))
+
+        zmat_tmp = matmul(zjx_op,zrho_dm(:,:,ik))
+        jxy_t(1) = jxy_t(1) + zmat_tmp(1,1)+ zmat_tmp(2,2)
+
+        zmat_tmp = matmul(zjy_op,zrho_dm(:,:,ik))
+        jxy_t(2) = jxy_t(2) + zmat_tmp(1,1)+ zmat_tmp(2,2)
+
+      end do
+
+      call comm_allreduce(jxy_t)
+      jxy_t = 2d0*jxy_t*dkxy/(2d0*pi)**2
+
+    end subroutine calc_current_elec_system
+!-------------------------------------------------------------------------------
 ! diagonalize a special matrix
 ! ( 0,       za)
 ! (conjg(za), 0)
@@ -224,6 +265,18 @@ module electronic_system
                  + exp(zi*(delta_l(1,3)*kx_t + delta_l(2,3)*ky_t)) 
 
     end function zfk_tb
+!-------------------------------------------------------------------------------
+    function zdfk_dk_tb(kx_t, ky_t) result(zdfk_dk_result)
+      implicit none
+      real(8),intent(in) :: kx_t, ky_t
+      complex(8) :: zdfk_dk_result(2)
+
+      zdfk_dk_result(:) = zi*( &
+        delta_l(:,1)*exp(zi*(delta_l(1,1)*kx_t + delta_l(2,1)*ky_t)) &
+      + delta_l(:,2)*exp(zi*(delta_l(1,2)*kx_t + delta_l(2,2)*ky_t)) &
+      + delta_l(:,3)*exp(zi*(delta_l(1,3)*kx_t + delta_l(2,3)*ky_t)))
+
+    end function zdfk_dk_tb
 !-------------------------------------------------------------------------------
 ! diagonalize a special matrix
 ! H = ( 0,       za),  compute [H, rho]
