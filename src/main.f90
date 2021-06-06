@@ -6,7 +6,7 @@ program main
 
   call init_parallel
   call init_inputoutput
-  write(*,*)'myrank=',comm_id_global
+!  write(*,*)'myrank=',comm_id_global
 
   call calc_electron_dynamics
 

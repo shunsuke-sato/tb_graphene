@@ -169,7 +169,7 @@ module electron_dynamics
 
         zrho_dm_RK4(:,:,3) = zLrho_dm_t + zrho_col
 
-! RK3
+! RK4
         tt = it*time_step + time_step
         zrho_dm_t(:,:) = zrho_dm(:,:,ik) + zrho_dm_RK4(:,:,3)*time_step
 
