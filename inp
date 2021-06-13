@@ -11,8 +11,15 @@ kbT_K = 300d0
 total_propagation_time_fs = 1.0
 time_step = 0.1
 
-E0_pulse_1_x_Vm = 1.0
-E0_pulse_1_y_Vm = 0.0
+E0_pulse_1_Vm = 1.0
+pol_theta_1_2pi = 0d0
 pulse_width_1_fs = 1.0
 
 omega_1_ev = 1.55
+
+
+E0_pulse_2_Vm = 1.0
+pol_theta_2_2pi = 0.250d0
+pulse_width_2_fs = 1.0
+
+omega_2_ev = 10.0

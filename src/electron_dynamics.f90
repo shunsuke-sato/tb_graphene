@@ -21,29 +21,32 @@ module electron_dynamics
       implicit none
       integer :: it, id_file_current
       real(8) :: jxy_t(2)
-      real(8) :: tt, Act_x, Act_y
+      real(8) :: tt, Act_x, Act_y, Et_x, Et_y
 
       call init_elec_system
       call init_electron_dynamics
       tt = 0d0
       call calc_vector_potential_time(tt, Act_x, Act_y)
+      call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
       kx = kx0 + Act_x; ky = ky0 + Act_y
       call calc_current_elec_system(jxy_t)
 
       if(if_root_global)then
         call get_newfile_id(id_file_current)
         open(id_file_current, file='jt_act.out')
-        write(id_file_current, "(A)")"# time, jx, jy, Acx, Acy"
-        write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y
+        write(id_file_current, "(A)")"# time, jx, jy, Acx, Acy, Ex, Ey"
+        write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y, Et_x, Et_y
       end if
 
       do it = 0, num_time_step
         call dt_evolve_elec(it)
         tt = (it+1)*time_step
         call calc_vector_potential_time(tt, Act_x, Act_y)
+        call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
         kx = kx0 + Act_x; ky = ky0 + Act_y
         call calc_current_elec_system(jxy_t)
-        if(if_root_global)write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y
+        if(if_root_global)write(id_file_current,"(999e26.16e3)")tt,jxy_t(:) &
+          ,act_x,act_y,Et_x,Et_y
       end do
 
       if(if_root_global)then
