@@ -30,6 +30,10 @@ module laser
   real(8) :: A0_impulse_1_x, A0_impulse_1_y
   real(8) :: impulse_center_1
 
+! dc-field
+  logical :: if_dc_field
+  real(8) :: E0_dc_x, E0_dc_y
+
 
   contains
 !-------------------------------------------------------------------------------
@@ -47,6 +51,8 @@ module laser
       real(8) :: omega_2_ev, phi_CEP_2_x_2pi, phi_CEP_2_y_2pi
 ! impulse 1
       real(8) :: impulse_center_1_fs
+! dc-field
+      real(8) :: E0_dc_x_Vm, E0_dc_y_Vm
 
 ! laser 1
       call read_basic_input('E0_pulse_1_x_Vm',E0_pulse_1_x_Vm,val_default = 0d0)
@@ -135,6 +141,16 @@ module laser
       if_impulse_1 = .true.
       if(abs(A0_impulse_1_x) + abs(A0_impulse_1_y) == 0) if_impulse_1 = .false.
 
+! dc-field
+      call read_basic_input('E0_dc_x_Vm',E0_dc_x_Vm,val_default = 0d0)
+      call read_basic_input('E0_dc_y_Vm',E0_dc_y_Vm,val_default = 0d0)
+
+      E0_dc_x = E0_dc_x_Vm*ev/(angstrom*1d10)
+      E0_dc_y = E0_dc_y_Vm*ev/(angstrom*1d10)
+
+      if_dc_field = .true.
+      if(abs(E0_dc_x) + abs(E0_dc_y) == 0) if_dc_field = .false.
+
     end subroutine init_laser
 !-------------------------------------------------------------------------------
     subroutine calc_vector_potential_time(tt, Act_x, Act_y)
@@ -178,6 +194,12 @@ module laser
           Act_x = Act_x + A0_impulse_1_x
           Act_y = Act_y + A0_impulse_1_y
         end if
+      end if
+
+! dc-field
+      if(if_dc_field)then
+        Act_x = Act_x - E0_dc_x*tt
+        Act_y = Act_y - E0_dc_y*tt
       end if
 
     end subroutine calc_vector_potential_time
