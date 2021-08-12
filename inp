@@ -4,7 +4,7 @@ nk2 = 4
 T1_relax_fs = 100d0
 T2_relax_fs = 20d0
 
-mu_F_ev = 0d0
+doping_per_site = 0.01d0
 kbT_K = 300d0
 
 
