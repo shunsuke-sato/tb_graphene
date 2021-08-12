@@ -32,7 +32,8 @@ module electronic_system
   complex(8),allocatable,public :: zrho_dm(:,:,:)
   real(8),public :: t1_relax, t2_relax, t1_relax_fs, t2_relax_fs
   real(8),public :: mu_F, mu_F_ev
-  real(8),public :: kbT, kbT_K
+  real(8),public :: kbT, kbT_K, doping_per_site
+  logical,public :: if_chemical_potential_is_given
 
 
   real(8),allocatable :: eps_dist(:,:),occ_dist(:,:)
@@ -42,6 +43,7 @@ module electronic_system
       implicit none
       integer :: ik1, ik2, ik
       integer :: id_file
+      logical :: if_default_mu_F, if_default_doping_per_site
 
 ! set prameters
 
@@ -81,8 +83,19 @@ module electronic_system
       T1_relax = T1_relax_fs*fs
       T2_relax = T2_relax_fs*fs
 
-      call read_basic_input('mu_F_ev',mu_F_ev,val_default = 0d0)
+      call read_basic_input('mu_F_ev',mu_F_ev,val_default = 0d0 &
+        ,if_default = if_default_mu_F)
       mu_F = mu_F_ev*ev
+      if_chemical_potential_is_given = .not. if_default_mu_F
+
+      call read_basic_input('doping_per_site',doping_per_site,val_default = 0d0 &
+        ,if_default = if_default_doping_per_site)
+
+      if((.not.if_default_mu_F) .and. (.not.if_default_doping_per_site))then
+        message(1)= &
+          'Error message: mu_F_ev and doping_per_site cannot be used simultaneously.'
+        call error_finalize(message(1))
+      end if
 
       call read_basic_input('kbT_K',kbT_K,val_default = 0d0)
       kbT  = kbT_K/11604.505d0*ev
@@ -147,11 +160,145 @@ module electronic_system
 !-------------------------------------------------------------------------------
     subroutine initialize_density_matrix
       implicit none
-      integer :: ik
+      integer :: ik, iter
       real(8) :: kx_t, ky_t
       complex(8) :: zfk_t, zalpha
       complex(8) :: zeigv(2,2)
       real(8) :: eig(2), occ(2)
+      real(8) :: mu_F_min, mu_F_max, pop_per_site, pop_per_site_ref
+
+      eps_dist = 0d0
+      occ_dist = 0d0
+
+      do ik = nk_start, nk_end
+        kx_t = kx(ik)
+        ky_t = ky(ik)
+
+        zfk_t = zfk_tb(kx_t, ky_t)
+        zalpha = -t_hop*zfk_t
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+
+        zrho_dm(1,1, ik) = occ(1)*abs(zeigv(1,1))**2 &
+                         + occ(2)*abs(zeigv(1,2))**2
+
+        zrho_dm(2,1, ik) = occ(1)*zeigv(2,1)*conjg(zeigv(1,1)) &
+                         + occ(2)*zeigv(2,2)*conjg(zeigv(1,2))
+
+        zrho_dm(2,2, ik) = occ(1)*abs(zeigv(2,1))**2 &
+                         + occ(2)*abs(zeigv(2,2))**2
+
+        zrho_dm(1,2, ik) = conjg(zrho_dm(2,1, ik))
+
+
+        eps_dist(:,ik) = eig(:)
+        occ_dist(:,ik) = occ(:)
+
+      end do
+
+      call comm_allreduce(eps_dist)
+      call comm_allreduce(occ_dist)
+
+      if(if_chemical_potential_is_given)return
+      pop_per_site_ref = 1d0 + doping_per_site
+
+! defining chemical potential by bi-section method
+      if(doping_per_site>1d0)then
+        message(1)= &
+          'Error message: doping_per_site is too large (>1).'
+        call error_finalize(message(1))
+      else if(doping_per_site<-1d0)then
+        message(1)= &
+          'Error message: doping_per_site is too small (<-1).'
+        call error_finalize(message(1))
+      end if
+
+
+      pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
+      call comm_bcast(pop_per_site)
+      if(pop_per_site > pop_per_site_ref)then
+        mu_F_max = mu_F
+        mu_F = minval(eps_dist)
+        call comm_bcast(mu_F)
+
+        occ_dist = 0d0
+        do ik = nk_start, nk_end
+          occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
+          occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
+        end do
+        call comm_allreduce(occ_dist)
+        pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
+        call comm_bcast(pop_per_site)
+        if(pop_per_site > pop_per_site_ref)then
+          message(1)= &
+            'Error message: something wrong happans in the doping parameters (see initialize_density_matrix routine).'
+          message(2)= 'pop_per_site > doping_per_site'
+          call error_finalize(message(1:2))
+        else
+          mu_F_min = mu_F
+        end if
+
+      else
+        mu_F_min = mu_F
+        mu_F = maxval(eps_dist)
+        call comm_bcast(mu_F)
+
+        occ_dist = 0d0
+        do ik = nk_start, nk_end
+          occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
+          occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
+        end do
+        call comm_allreduce(occ_dist)
+        pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
+        call comm_bcast(pop_per_site)
+        if(pop_per_site <= pop_per_site_ref)then
+          message(1)= &
+            'Error message: something wrong happans in the doping parameters (see initialize_density_matrix routine).'
+          message(2)= 'pop_per_site <= doping_per_site'
+          call error_finalize(message(1:2))
+        else
+          mu_F_max = mu_F
+        end if
+      end if
+
+
+! serch minimum
+      iter = 0
+      do
+        iter = iter + 1
+        mu_F = 0.5d0*(mu_F_max + mu_F_min)
+        occ_dist = 0d0
+        do ik = nk_start, nk_end
+          occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
+          occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
+        end do
+        call comm_allreduce(occ_dist)
+        pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
+        call comm_bcast(pop_per_site)
+        if(pop_per_site > pop_per_site_ref)then
+          mu_F_max = mu_F
+        else
+          mu_F_min = mu_F
+        end if
+
+        if(abs(mu_F_max-mu_F_min) < 1d-10)exit
+        if(iter > 1000)then
+          message(1)= &
+            'Error message: chemical potential search does not converge.'
+          call error_finalize(message(1))
+        end if
+
+      end do
+
+      mu_F = 0.5d0*(mu_F_max + mu_F_min)
+
+      if(if_root_global)then
+        write(*,"(A,2x,I7)")'Chemical potential is computed with the iteration of',iter
+        write(*,"(A,2x,e26.16e3,2x,A)")'The computed chemical potential is ',mu_F,"a.u."
+        write(*,"(A,2x,e26.16e3,2x,A)")'The computed chemical potential is ',mu_F/ev*1d3,"meV."
+      end if
+
 
       eps_dist = 0d0
       occ_dist = 0d0
