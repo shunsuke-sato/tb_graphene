@@ -11,7 +11,8 @@ module electronic_system
            ,calc_commutator_2x2_gra_density_matrix &
            ,calc_eigv_2x2_gra &
            ,zfk_tb &
-           ,calc_current_elec_system
+           ,calc_current_elec_system &
+           ,calc_energy_elec_system
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
 
@@ -44,6 +45,7 @@ module electronic_system
       integer :: ik1, ik2, ik
       integer :: id_file
       logical :: if_default_mu_F, if_default_doping_per_site
+      real(8) :: Eelec_t
 
 ! set prameters
 
@@ -144,7 +146,7 @@ module electronic_system
         call get_newfile_id(id_file)
         open(id_file, file='electronic_structure.out')
         do ik1 = 0, nk1-1
-          do ik2 = 1, nk2-1
+          do ik2 = 0, nk2-1
             write(id_file,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
                                          ,ky(ik_table(ik1,ik2)) &
                                          ,eps_dist(:,ik_table(ik1,ik2)) &
@@ -155,6 +157,11 @@ module electronic_system
         close(id_file)
       end if
 
+      call calc_energy_elec_system(Eelec_t)
+      if(if_root_global)then
+        write(*,"(A,2x,e26.16e3,2x,A)")'The initial electronic energy is ',Eelec_t,"a.u."
+        write(*,"(A,2x,e26.16e3,2x,A)")'The initial electronic energy is ',Eelec_t/ev*1d3,"meV."
+      end if
       
     end subroutine init_elec_system
 !-------------------------------------------------------------------------------
@@ -370,6 +377,44 @@ module electronic_system
       jxy_t = 2d0*jxy_t*dkxy/(2d0*pi)**2
 
     end subroutine calc_current_elec_system
+!-------------------------------------------------------------------------------
+    subroutine calc_energy_elec_system(Eelec_t)
+      implicit none
+      real(8),intent(out) :: Eelec_t
+      complex(8) :: zfk_t, zalpha
+      real(8) :: kx_t, ky_t
+      integer :: ik
+
+      Eelec_t = 0d0
+
+      do ik = nk_start, nk_end
+        kx_t = kx(ik)
+        ky_t = ky(ik)
+
+        zfk_t = zfk_tb(kx_t, ky_t)
+        zalpha = -t_hop*zfk_t
+
+! H = ( 0,       za)
+!     (conjg(za), 0)        
+
+! Tr[H*zrho_dm]
+        Eelec_t = Eelec_t + zalpha*zrho_dm(2,1,ik) &
+                          + conjg(zalpha)*zrho_dm(1,2,ik)
+
+!! debug
+!        zham = 0d0
+!        zham(1,1) = 0d0; zham(1,2) = zalpha
+!        zham(2,1) = conjg(zalpha); zham(2,2) = 0d0
+!
+!        zmat = matmul(zham,zrho_dm(:,:,ik))
+!        Eelec_t = Eelec_t + zmat(1,1)+zmat(2,2)
+
+      end do
+
+      call comm_allreduce(Eelec_t)
+      Eelec_t = 2d0*Eelec_t*dkxy/(2d0*pi)**2
+
+    end subroutine calc_energy_elec_system
 !-------------------------------------------------------------------------------
 ! diagonalize a special matrix
 ! ( 0,       za)
