@@ -19,8 +19,8 @@ module electron_dynamics
 !-------------------------------------------------------------------------------
     subroutine calc_electron_dynamics
       implicit none
-      integer :: it, id_file_current
-      real(8) :: jxy_t(2)
+      integer :: it, id_file_current, id_file_energy
+      real(8) :: jxy_t(2), Eelec_t
       real(8) :: tt, Act_x, Act_y, Et_x, Et_y
 
       call init_elec_system
@@ -30,12 +30,18 @@ module electron_dynamics
       call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
       kx = kx0 + Act_x; ky = ky0 + Act_y
       call calc_current_elec_system(jxy_t)
+      call calc_energy_elec_system(Eelec_t)
 
       if(if_root_global)then
         call get_newfile_id(id_file_current)
         open(id_file_current, file='jt_act.out')
         write(id_file_current, "(A)")"# time, jx, jy, Acx, Acy, Ex, Ey"
         write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y, Et_x, Et_y
+
+        call get_newfile_id(id_file_energy)
+        open(id_file_energy, file='energy_t.out')
+        write(id_file_energy, "(A)")"# time, Energy"
+        write(id_file_energy,"(999e26.16e3)")tt,Eelec_t
       end if
 
       do it = 0, num_time_step
@@ -45,12 +51,16 @@ module electron_dynamics
         call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
         kx = kx0 + Act_x; ky = ky0 + Act_y
         call calc_current_elec_system(jxy_t)
-        if(if_root_global)write(id_file_current,"(999e26.16e3)")tt,jxy_t(:) &
-          ,act_x,act_y,Et_x,Et_y
+        call calc_energy_elec_system(Eelec_t)
+        if(if_root_global)then
+          write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y,Et_x,Et_y
+          write(id_file_energy,"(999e26.16e3)")tt,Eelec_t
+        end if
       end do
 
       if(if_root_global)then
         close(id_file_current)
+        close(id_file_energy)
       end if
 
     end subroutine calc_electron_dynamics
