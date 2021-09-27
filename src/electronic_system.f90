@@ -365,10 +365,10 @@ module electronic_system
 
         zdfk_dk(:) = zdfk_dk_tb(kx_t, ky_t)
         zjx_op(1,2) = t_hop*zdfk_dk(1) ! *(-1)*(-1)
-        zjx_op(2,1) = conjg(zjx_op(2,1))
+        zjx_op(2,1) = conjg(zjx_op(1,2))
 
         zjy_op(1,2) = t_hop*zdfk_dk(2) ! *(-1)*(-1)
-        zjy_op(2,1) = conjg(zjy_op(2,1))
+        zjy_op(2,1) = conjg(zjy_op(1,2))
 
         zmat_tmp = matmul(zjx_op,zrho_dm(:,:,ik))
         jxy_t(1) = jxy_t(1) + zmat_tmp(1,1)+ zmat_tmp(2,2)
