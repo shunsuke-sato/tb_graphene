@@ -342,11 +342,14 @@ module electronic_system
 
     end subroutine initialize_density_matrix
 !-------------------------------------------------------------------------------
-    subroutine calc_current_elec_system(jxy_t)
+    subroutine calc_current_elec_system(jxy_t, jxy_intra_c_t, jxy_intra_v_t)
       implicit none
-      real(8),intent(out) :: jxy_t(2)
+      real(8),intent(out) :: jxy_t(2),jxy_intra_c_t(2),jxy_intra_v_t(2)
       complex(8) :: zjx_op(2,2), zjy_op(2,2)
       complex(8) :: zdfk_dk(2), zmat_tmp(2,2)
+      complex(8) :: zfk_t, zalpha
+      complex(8) :: zeigv(2,2), zrho_dm_occ(2,2)
+      real(8) :: eig(2), occ(2)
       real(8) :: kx_t, ky_t
       integer :: ik
 
@@ -354,6 +357,8 @@ module electronic_system
       zjy_op = 0d0
 
       jxy_t = 0d0
+      jxy_intra_c_t=0d0
+      jxy_intra_v_t=0d0
       do ik = nk_start, nk_end
         kx_t = kx(ik)
         ky_t = ky(ik)
@@ -371,10 +376,31 @@ module electronic_system
         zmat_tmp = matmul(zjy_op,zrho_dm(:,:,ik))
         jxy_t(2) = jxy_t(2) + zmat_tmp(1,1)+ zmat_tmp(2,2)
 
+        zfk_t = zfk_tb(kx_t, ky_t)
+        zalpha = -t_hop*zfk_t
+! H = ( 0,       za)
+!     (conjg(za), 0)        
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+
+        zrho_dm_occ = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm(:,:,ik), zeigv))
+        occ(1) = zrho_dm_occ(1,1)
+        occ(2) = zrho_dm_occ(2,2)
+
+        jxy_intra_c_t(:) = jxy_intra_c_t(:) &
+          - occ(1)*abs(t_hop)*zdfk_dk(:)*conjg(zfk_t)/abs(zfk_t)
+        jxy_intra_v_t(:) = jxy_intra_v_t(:) &
+          + occ(2)*abs(t_hop)*zdfk_dk(:)*conjg(zfk_t)/abs(zfk_t)
+
       end do
 
       call comm_allreduce(jxy_t)
       jxy_t = 2d0*jxy_t*dkxy/(2d0*pi)**2
+
+      call comm_allreduce(jxy_intra_c_t)
+      jxy_intra_c_t = 2d0*jxy_intra_c_t*dkxy/(2d0*pi)**2
+
+      call comm_allreduce(jxy_intra_v_t)
+      jxy_intra_v_t = 2d0*jxy_intra_v_t*dkxy/(2d0*pi)**2
 
     end subroutine calc_current_elec_system
 !-------------------------------------------------------------------------------

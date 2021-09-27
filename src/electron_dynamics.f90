@@ -20,7 +20,7 @@ module electron_dynamics
     subroutine calc_electron_dynamics
       implicit none
       integer :: it, id_file_current, id_file_energy
-      real(8) :: jxy_t(2), Eelec_t
+      real(8) :: jxy_t(2), jxy_intra_c_t(2), jxy_intra_v_t(2), Eelec_t
       real(8) :: tt, Act_x, Act_y, Et_x, Et_y
 
       call init_elec_system
@@ -29,15 +29,16 @@ module electron_dynamics
       call calc_vector_potential_time(tt, Act_x, Act_y)
       call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
       kx = kx0 + Act_x; ky = ky0 + Act_y
-      call calc_current_elec_system(jxy_t)
+      call calc_current_elec_system(jxy_t, jxy_intra_c_t, jxy_intra_v_t)
       call calc_energy_elec_system(Eelec_t)
 
       if(if_root_global)then
         call get_newfile_id(id_file_current)
         open(id_file_current, file='jt_act.out')
-        write(id_file_current, "(A)")"# time, jx, jy, Acx, Acy, Ex, Ey"
-        write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y, Et_x, Et_y
-
+        write(id_file_current, "(A)")&
+"# 1.time 2.jx 3.jy 4.Acx 5.Acy 6.Ex 7.Ey 8.jx_intra 9.jy_intra 10.jx_intra_c 11.jy_intra_c 12.jx_intra_v 13.jy_intra_v"
+        write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y,Et_x,Et_y &
+          ,jxy_intra_c_t(:)+jxy_intra_v_t(:),jxy_intra_c_t(:),jxy_intra_v_t(:)
         call get_newfile_id(id_file_energy)
         open(id_file_energy, file='energy_t.out')
         write(id_file_energy, "(A)")"# time, Energy"
@@ -50,10 +51,11 @@ module electron_dynamics
         call calc_vector_potential_time(tt, Act_x, Act_y)
         call calc_electric_field_time(tt, time_step*0.1d0, Et_x, Et_y)
         kx = kx0 + Act_x; ky = ky0 + Act_y
-        call calc_current_elec_system(jxy_t)
+        call calc_current_elec_system(jxy_t, jxy_intra_c_t, jxy_intra_v_t)
         call calc_energy_elec_system(Eelec_t)
         if(if_root_global)then
-          write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y,Et_x,Et_y
+          write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y,Et_x,Et_y &
+            ,jxy_intra_c_t(:)+jxy_intra_v_t(:),jxy_intra_c_t(:),jxy_intra_v_t(:)
           write(id_file_energy,"(999e26.16e3)")tt,Eelec_t
         end if
       end do
