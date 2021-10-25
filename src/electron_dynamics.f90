@@ -60,6 +60,8 @@ module electron_dynamics
         end if
       end do
 
+      call calc_carrier_distribution('final_population_dist.out')
+      
       if(if_root_global)then
         close(id_file_current)
         close(id_file_energy)
