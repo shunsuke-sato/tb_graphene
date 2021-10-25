@@ -12,7 +12,8 @@ module electronic_system
            ,calc_eigv_2x2_gra &
            ,zfk_tb &
            ,calc_current_elec_system &
-           ,calc_energy_elec_system
+           ,calc_energy_elec_system &
+           ,calc_carrier_distribution
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
 
@@ -517,6 +518,64 @@ module electronic_system
 
     end subroutine calc_commutator_2x2_gra_density_matrix
 !-------------------------------------------------------------------------------
+    subroutine calc_carrier_distribution(cfilename_t)
+      implicit none
+      character(*),intent(in),optional :: cfilename_t
+      integer :: ik, ik1, ik2, id_file_t
+      real(8) :: kx_t, ky_t
+      complex(8) :: zfk_t, zalpha
+      complex(8) :: zeigv(2,2)
+      real(8) :: eig(2), occ(2), occ_t(2)
+      real(8) :: docc_dist(2,nk)
+
+
+      eps_dist = 0d0
+      occ_dist = 0d0
+      docc_dist = 0d0
+
+      do ik = nk_start, nk_end
+        kx_t = kx(ik)
+        ky_t = ky(ik)
+
+        zfk_t = zfk_tb(kx_t, ky_t)
+        zalpha = -t_hop*zfk_t
+        call calc_eigv_2x2_gra(zalpha, zeigv, eig)
+        occ_t(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+        occ_t(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+
+
+        occ(1) = sum(conjg(zeigv(:,1))* matmul(zrho_dm(:,:,ik),zeigv(:,1)))
+        occ(2) = sum(conjg(zeigv(:,2))* matmul(zrho_dm(:,:,ik),zeigv(:,2)))
+
+        eps_dist(:,ik) = eig(:)
+        occ_dist(:,ik) = occ(:)
+
+        docc_dist(:,ik) = occ(:)-occ_t(:)
+
+      end do
+
+      call comm_allreduce(eps_dist)
+      call comm_allreduce(occ_dist)
+      call comm_allreduce(docc_dist)
+
+      if(if_root_global)then
+         call get_newfile_id(id_file_t)
+         open(id_file_t,file=trim(cfilename_t))
+         write(id_file_t,"(A)")"#kx, ky, eps(1:2), occ(1:2), docc(1:2)"
+         do ik1 = 0, nk1-1
+            do ik2 = 0, nk2-1
+               write(id_file_t,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
+                                            ,ky(ik_table(ik1,ik2)) &
+                                            ,eps_dist(:,ik_table(ik1,ik2)) &
+                                            ,occ_dist(:,ik_table(ik1,ik2)) &
+                                            ,docc_dist(:,ik_table(ik1,ik2))
+            end do
+            write(id_file_t,*)
+         end do
+         close(id_file_t)
+      end if
+      
+    end subroutine calc_carrier_distribution
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
