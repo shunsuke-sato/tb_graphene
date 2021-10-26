@@ -13,10 +13,14 @@ contains
     real(8) :: y
 
     y = 0d0
-    if(kbT <= 0d0)then
-      if(eps <= e_Fermi)y=1d0
+    if(eps<=0d0)then
+       y=1d0
     else
-      y = 1d0/(exp((eps - e_Fermi)/kbT) + 1d0)
+       if(kbT <= 0d0)then
+          if(eps <= e_Fermi)y=1d0
+       else
+          y = 1d0/(exp((eps - e_Fermi)/kbT) + 1d0)
+       end if
     end if
     
   end function Fermi_Dirac_distribution
