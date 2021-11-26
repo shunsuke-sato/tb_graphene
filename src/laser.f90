@@ -34,7 +34,11 @@ module laser
   logical :: if_dc_field
   real(8) :: E0_dc_x, E0_dc_y
 
-
+! cw-field 1  
+  logical :: if_cw_field_1
+  real(8) :: E0_cw_1_x, E0_cw_1_y
+  real(8) :: omega_cw_1, phi_CEP_cw_1_x, phi_CEP_cw_1_y
+  
   contains
 !-------------------------------------------------------------------------------
     subroutine init_laser
@@ -53,7 +57,11 @@ module laser
       real(8) :: impulse_center_1_fs
 ! dc-field
       real(8) :: E0_dc_x_Vm, E0_dc_y_Vm
+! cw-field 1      
+      real(8) :: E0_cw_1_x_Vm, E0_cw_1_y_Vm
+      real(8) :: omega_cw_1_ev, phi_CEP_cw_1_x_2pi, phi_CEP_cw_1_y_2pi
 
+      
 ! laser 1
       call read_basic_input('E0_pulse_1_x_Vm',E0_pulse_1_x_Vm,val_default = 0d0)
       call read_basic_input('E0_pulse_1_y_Vm',E0_pulse_1_y_Vm,val_default = 0d0)
@@ -151,6 +159,24 @@ module laser
       if_dc_field = .true.
       if(abs(E0_dc_x) + abs(E0_dc_y) == 0) if_dc_field = .false.
 
+! cw-field 1
+      call read_basic_input('E0_cw_1_x_Vm',E0_cw_1_x_Vm,val_default = 0d0)
+      call read_basic_input('E0_cw_1_y_Vm',E0_cw_1_y_Vm,val_default = 0d0)
+
+      call read_basic_input('omega_cw_1_ev',omega_cw_1_ev,val_default = 0d0)
+
+      call read_basic_input('phi_CEP_cw_1_x_2pi',phi_CEP_cw_1_x_2pi,val_default = 0d0)
+      call read_basic_input('phi_CEP_cw_1_y_2pi',phi_CEP_cw_1_y_2pi,val_default = 0d0)
+
+      E0_cw_1_x = E0_cw_1_x_Vm*ev/(angstrom*1d10)
+      E0_cw_1_y = E0_cw_1_y_Vm*ev/(angstrom*1d10)
+      omega_cw_1   = omega_cw_1_ev*ev      
+      phi_CEP_cw_1_x = phi_CEP_cw_1_x_2pi*2d0*pi
+      phi_CEP_cw_1_y = phi_CEP_cw_1_y_2pi*2d0*pi
+
+      if_cw_field_1 = .true.
+      if(abs(E0_cw_1_x)+abs(E0_cw_1_y) == 0d0) if_cw_field_1 = .false.
+      
     end subroutine init_laser
 !-------------------------------------------------------------------------------
     subroutine calc_vector_potential_time(tt, Act_x, Act_y)
@@ -202,6 +228,14 @@ module laser
         Act_y = Act_y - E0_dc_y*tt
       end if
 
+
+! cw-field 1
+      if(if_cw_field_1)then
+         Act_x = Act_x -(E0_cw_1_x/omega_cw_1)*sin(omega_cw_1*tt+phi_CEP_cw_1_x)
+         Act_y = Act_y -(E0_cw_1_y/omega_cw_1)*sin(omega_cw_1*tt+phi_CEP_cw_1_y) 
+      end if
+
+      
     end subroutine calc_vector_potential_time
 !-------------------------------------------------------------------------------
     subroutine calc_electric_field_time(tt, dt, Et_x, Et_y)
