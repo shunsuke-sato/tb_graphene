@@ -260,7 +260,7 @@ module electronic_system
           occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
           occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
         end do
-        call comm_allreduce(occ_dist)
+
         pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
         call comm_bcast(pop_per_site)
         if(pop_per_site > pop_per_site_ref)then
@@ -282,7 +282,7 @@ module electronic_system
           occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
           occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
         end do
-        call comm_allreduce(occ_dist)
+
         pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
         call comm_bcast(pop_per_site)
         if(pop_per_site <= pop_per_site_ref)then
@@ -548,11 +548,12 @@ module electronic_system
       complex(8) :: zfk_t, zalpha
       complex(8) :: zeigv(2,2)
       real(8) :: eig(2), occ(2), occ_t(2)
+      real(8) :: kx_g(nk),ky_g(nk)
       real(8) :: eps_dist_g(2,nk)
       real(8) :: occ_dist_g(2,nk)
       real(8) :: docc_dist_g(2,nk)
 
-
+      kx_g = 0d0; kx_g = 0d0
       eps_dist_g = 0d0
       occ_dist_g = 0d0
       docc_dist_g = 0d0
@@ -560,6 +561,9 @@ module electronic_system
       do ik = nk_start, nk_end
         kx_t = kx(ik)
         ky_t = ky(ik)
+
+        kx_g(ik) = kx(ik)
+        ky_g(ik) = ky(ik)
 
         zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
@@ -578,6 +582,8 @@ module electronic_system
 
       end do
 
+      call comm_allreduce(kx_g)
+      call comm_allreduce(ky_g)
       call comm_allreduce(eps_dist_g)
       call comm_allreduce(occ_dist_g)
       call comm_allreduce(docc_dist_g)
@@ -588,8 +594,8 @@ module electronic_system
          write(id_file_t,"(A)")"#kx, ky, eps(1:2), occ(1:2), docc(1:2)"
          do ik1 = 0, nk1-1
             do ik2 = 0, nk2-1
-               write(id_file_t,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
-                                            ,ky(ik_table(ik1,ik2)) &
+               write(id_file_t,"(999e26.16e3)")kx_g(ik_table(ik1,ik2)) &
+                                            ,ky_g(ik_table(ik1,ik2)) &
                                             ,eps_dist_g(:,ik_table(ik1,ik2)) &
                                             ,occ_dist_g(:,ik_table(ik1,ik2)) &
                                             ,docc_dist_g(:,ik_table(ik1,ik2))
