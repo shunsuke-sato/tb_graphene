@@ -1,4 +1,5 @@
 module electronic_system
+  use mpi
   use parallel
   use communication
   use inputoutput
@@ -37,8 +38,10 @@ module electronic_system
   real(8),public :: kbT, kbT_K, doping_per_site
   logical,public :: if_chemical_potential_is_given
 
-
   real(8),allocatable :: eps_dist(:,:),occ_dist(:,:)
+
+  logical,public :: if_output_kspace_distribution
+
   contains
 !-------------------------------------------------------------------------------
     subroutine init_elec_system
@@ -47,6 +50,8 @@ module electronic_system
       integer :: id_file
       logical :: if_default_mu_F, if_default_doping_per_site
       real(8) :: Eelec_t
+      real(8),allocatable :: kx_g(:),ky_g(:)
+      real(8),allocatable :: eps_dist_g(:,:),occ_dist_g(:,:)
 
 ! set prameters
 
@@ -117,11 +122,11 @@ module electronic_system
       end if
 
 
-      allocate(kx(nk),ky(nk))
-      allocate(kx0(nk),ky0(nk))    
+      allocate(kx(nk_start:nk_end),ky(nk_start:nk_end))
+      allocate(kx0(nk_start:nk_end),ky0(nk_start:nk_end))    
       allocate(zrho_dm(2,2,nk_start:nk_end))
       allocate(ik_table(0:nk1-1,0:nk2-1))
-      allocate(eps_dist(2,nk),occ_dist(2,nk))
+      allocate(eps_dist(2,nk_start:nk_end),occ_dist(2,nk_start:nk_end))
 
       dkxy = abs(b_l(1,1)*b_l(2,2)-b_l(2,1)*b_l(1,2))/nk
       
@@ -130,9 +135,11 @@ module electronic_system
       do ik1 = 0, nk1-1
         do ik2 = 0, nk2-1
           ik = ik + 1
-          
-          kx0(ik) = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
-          ky0(ik) = b_l(2,1)*ik1/dble(nk1) + b_l(2,2)*ik2/dble(nk2)
+
+          if(ik >= nk_start .and. ik <= nk_end)then
+             kx0(ik) = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
+             ky0(ik) = b_l(2,1)*ik1/dble(nk1) + b_l(2,2)*ik2/dble(nk2)
+          end if
  
           ik_table(ik1,ik2) = ik
           
@@ -143,19 +150,40 @@ module electronic_system
       ky = ky0
 
       call initialize_density_matrix
-      if(if_root_global)then
-        call get_newfile_id(id_file)
-        open(id_file, file='electronic_structure.out')
-        do ik1 = 0, nk1-1
-          do ik2 = 0, nk2-1
-            write(id_file,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
-                                         ,ky(ik_table(ik1,ik2)) &
-                                         ,eps_dist(:,ik_table(ik1,ik2)) &
-                                         ,occ_dist(:,ik_table(ik1,ik2))
-          end do
-          write(id_file,*)
-        end do
-        close(id_file)
+
+      call read_basic_input('if_output_kspace_distribution' &
+           ,if_output_kspace_distribution,val_default = .true.)
+
+      if(if_output_kspace_distribution)then
+
+         allocate(kx_g(nk),ky_g(nk))
+         allocate(eps_dist_g(2,nk),occ_dist_g(2,nk))
+         kx_g = 0d0; ky_g = 0d0
+         kx_g(nk_start:nk_end) = kx(nk_start:nk_end)
+         ky_g(nk_start:nk_end) = ky(nk_start:nk_end)
+         eps_dist_g = 0d0; occ_dist_g = 0d0
+         eps_dist_g(:,nk_start:nk_end) = eps_dist(:,nk_start:nk_end)
+         occ_dist_g(:,nk_start:nk_end) = occ_dist(:,nk_start:nk_end)
+
+         call comm_allreduce(kx_g)
+         call comm_allreduce(ky_g)
+         call comm_allreduce(eps_dist_g)
+         call comm_allreduce(occ_dist_g)
+
+         if(if_root_global)then
+            call get_newfile_id(id_file)
+            open(id_file, file='electronic_structure.out')
+            do ik1 = 0, nk1-1
+               do ik2 = 0, nk2-1
+                  write(id_file,"(999e26.16e3)")kx_g(ik_table(ik1,ik2)) &
+                                               ,ky_g(ik_table(ik1,ik2)) &
+                                               ,eps_dist_g(:,ik_table(ik1,ik2)) &
+                                               ,occ_dist_g(:,ik_table(ik1,ik2))
+               end do
+               write(id_file,*)
+            end do
+            close(id_file)
+         end if
       end if
 
       call calc_energy_elec_system(Eelec_t)
@@ -205,9 +233,6 @@ module electronic_system
 
       end do
 
-      call comm_allreduce(eps_dist)
-      call comm_allreduce(occ_dist)
-
       if(if_chemical_potential_is_given)return
       pop_per_site_ref = 1d0 + doping_per_site
 
@@ -224,11 +249,11 @@ module electronic_system
 
 
       pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
-      call comm_bcast(pop_per_site)
+      call comm_allreduce(pop_per_site)
       if(pop_per_site > pop_per_site_ref)then
         mu_F_max = mu_F
         mu_F = minval(eps_dist)
-        call comm_bcast(mu_F)
+        call comm_allreduce(mu_F, method = MPI_MIN)
 
         occ_dist = 0d0
         do ik = nk_start, nk_end
@@ -250,7 +275,7 @@ module electronic_system
       else
         mu_F_min = mu_F
         mu_F = maxval(eps_dist)
-        call comm_bcast(mu_F)
+        call comm_allreduce(mu_F, method = MPI_MAX)
 
         occ_dist = 0d0
         do ik = nk_start, nk_end
@@ -337,9 +362,6 @@ module electronic_system
         occ_dist(:,ik) = occ(:)
 
       end do
-
-      call comm_allreduce(eps_dist)
-      call comm_allreduce(occ_dist)
 
     end subroutine initialize_density_matrix
 !-------------------------------------------------------------------------------
@@ -526,12 +548,14 @@ module electronic_system
       complex(8) :: zfk_t, zalpha
       complex(8) :: zeigv(2,2)
       real(8) :: eig(2), occ(2), occ_t(2)
-      real(8) :: docc_dist(2,nk)
+      real(8) :: eps_dist_g(2,nk)
+      real(8) :: occ_dist_g(2,nk)
+      real(8) :: docc_dist_g(2,nk)
 
 
-      eps_dist = 0d0
-      occ_dist = 0d0
-      docc_dist = 0d0
+      eps_dist_g = 0d0
+      occ_dist_g = 0d0
+      docc_dist_g = 0d0
 
       do ik = nk_start, nk_end
         kx_t = kx(ik)
@@ -547,16 +571,16 @@ module electronic_system
         occ(1) = sum(conjg(zeigv(:,1))* matmul(zrho_dm(:,:,ik),zeigv(:,1)))
         occ(2) = sum(conjg(zeigv(:,2))* matmul(zrho_dm(:,:,ik),zeigv(:,2)))
 
-        eps_dist(:,ik) = eig(:)
-        occ_dist(:,ik) = occ(:)
+        eps_dist_g(:,ik) = eig(:)
+        occ_dist_g(:,ik) = occ(:)
 
-        docc_dist(:,ik) = occ(:)-occ_t(:)
+        docc_dist_g(:,ik) = occ(:)-occ_t(:)
 
       end do
 
-      call comm_allreduce(eps_dist)
-      call comm_allreduce(occ_dist)
-      call comm_allreduce(docc_dist)
+      call comm_allreduce(eps_dist_g)
+      call comm_allreduce(occ_dist_g)
+      call comm_allreduce(docc_dist_g)
 
       if(if_root_global)then
          call get_newfile_id(id_file_t)
@@ -566,9 +590,9 @@ module electronic_system
             do ik2 = 0, nk2-1
                write(id_file_t,"(999e26.16e3)")kx(ik_table(ik1,ik2)) &
                                             ,ky(ik_table(ik1,ik2)) &
-                                            ,eps_dist(:,ik_table(ik1,ik2)) &
-                                            ,occ_dist(:,ik_table(ik1,ik2)) &
-                                            ,docc_dist(:,ik_table(ik1,ik2))
+                                            ,eps_dist_g(:,ik_table(ik1,ik2)) &
+                                            ,occ_dist_g(:,ik_table(ik1,ik2)) &
+                                            ,docc_dist_g(:,ik_table(ik1,ik2))
             end do
             write(id_file_t,*)
          end do
