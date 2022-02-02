@@ -284,7 +284,7 @@ module electronic_system
         end do
 
         pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
-        call comm_bcast(pop_per_site)
+        call comm_allreduce(pop_per_site)
         if(pop_per_site <= pop_per_site_ref)then
           message(1)= &
             'Error message: something wrong happans in the doping parameters (see initialize_density_matrix routine).'
@@ -306,9 +306,9 @@ module electronic_system
           occ_dist(1,ik) = Fermi_Dirac_distribution(eps_dist(1,ik), mu_F, kbT)
           occ_dist(2,ik) = Fermi_Dirac_distribution(eps_dist(2,ik), mu_F, kbT)
         end do
-        call comm_allreduce(occ_dist)
+
         pop_per_site = 0.5d0*2d0*sum(occ_dist)/nk
-        call comm_bcast(pop_per_site)
+        call comm_allreduce(pop_per_site)
         if(pop_per_site > pop_per_site_ref)then
           mu_F_max = mu_F
         else
