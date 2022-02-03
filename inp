@@ -7,6 +7,7 @@ T2_relax_fs = 20d0
 doping_per_site = 0.01d0
 kbT_K = 300d0
 
+if_output_kspace_distribution = n
 
 total_propagation_time_fs = 10.0
 time_step = 0.1
