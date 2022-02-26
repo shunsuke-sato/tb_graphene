@@ -42,16 +42,23 @@ module electronic_system
 
   logical,public :: if_output_kspace_distribution
 
+  integer,public :: n_kpoint_sampling_method
+  integer,parameter,public :: n_kpoint_sampling_method_uniform = 0
+  integer,parameter,public :: n_kpoint_sampling_method_Halton = 1
+
   contains
 !-------------------------------------------------------------------------------
     subroutine init_elec_system
       implicit none
-      integer :: ik1, ik2, ik
+      integer :: ik1, ik2, ik, nk_tot
       integer :: id_file
       logical :: if_default_mu_F, if_default_doping_per_site
       real(8) :: Eelec_t
       real(8),allocatable :: kx_g(:),ky_g(:)
       real(8),allocatable :: eps_dist_g(:,:),occ_dist_g(:,:)
+      character(256) :: kpoint_sampling_method
+      logical :: if_default_tmp
+      real(8) :: x1,x2
 
 ! set prameters
 
@@ -108,8 +115,34 @@ module electronic_system
       call read_basic_input('kbT_K',kbT_K,val_default = 0d0)
       kbT  = kbT_K/11604.505d0*ev
 
+
+      
+      call read_basic_input('kpoint_sampling_method',kpoint_sampling_method &
+        ,val_default = 'kpoint_sampling_method_uniform')
+      if(kpoint_sampling_method == 'kpoint_sampling_method_uniform')then
+        n_kpoint_sampling_method = n_kpoint_sampling_method_uniform
+      else if(kpoint_sampling_method=='kpoint_sampling_method_halton' &
+        .or.kpoint_sampling_method=='kpoint_sampling_method_Halton')then
+        n_kpoint_sampling_method = n_kpoint_sampling_method_halton
+      else
+        message(1)= &
+          'Error message: Invarid input; kpoint_sampling_method.'
+        call error_finalize(message(1))
+      end if
+
 ! init grids and parallelization
-      nk = nk1*nk2
+      if(n_kpoint_sampling_method == n_kpoint_sampling_method_uniform)then
+        nk = nk1*nk2
+      else if(n_kpoint_sampling_method == n_kpoint_sampling_method_halton)then
+        call read_basic_input('nk_tot',nk_tot,val_default = 0 &
+          ,if_default = if_default_tmp)
+        nk = nk_tot
+        if(if_default_tmp)then
+          message(1)= &
+            'Error message: Invarid input; nk_tot must be defined for the Halton sequence sampling.'
+          call error_finalize(message(1))
+        end if
+      end if
 
       nk_average = nk/comm_nproc_global
       nk_remainder = mod(nk,comm_nproc_global)
@@ -125,26 +158,45 @@ module electronic_system
       allocate(kx(nk_start:nk_end),ky(nk_start:nk_end))
       allocate(kx0(nk_start:nk_end),ky0(nk_start:nk_end))    
       allocate(zrho_dm(2,2,nk_start:nk_end))
-      allocate(ik_table(0:nk1-1,0:nk2-1))
       allocate(eps_dist(2,nk_start:nk_end),occ_dist(2,nk_start:nk_end))
-
       dkxy = abs(b_l(1,1)*b_l(2,2)-b_l(2,1)*b_l(1,2))/nk
+
       
       ! initialize k-grids
-      ik = 0
-      do ik1 = 0, nk1-1
-        do ik2 = 0, nk2-1
-          ik = ik + 1
+      if(n_kpoint_sampling_method == n_kpoint_sampling_method_uniform)then
+! uniform sampling
+        allocate(ik_table(0:nk1-1,0:nk2-1))
 
-          if(ik >= nk_start .and. ik <= nk_end)then
-             kx0(ik) = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
-             ky0(ik) = b_l(2,1)*ik1/dble(nk1) + b_l(2,2)*ik2/dble(nk2)
-          end if
+
+        ik = 0
+        do ik1 = 0, nk1-1
+          do ik2 = 0, nk2-1
+            ik = ik + 1
+
+            if(ik >= nk_start .and. ik <= nk_end)then
+              kx0(ik) = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
+              ky0(ik) = b_l(2,1)*ik1/dble(nk1) + b_l(2,2)*ik2/dble(nk2)
+            end if
  
-          ik_table(ik1,ik2) = ik
+            ik_table(ik1,ik2) = ik
           
+          end do
         end do
-      end do
+      else if(n_kpoint_sampling_method == n_kpoint_sampling_method_halton)then
+! Halton sequence sampling
+        do ik = nk_start, nk_end
+
+          call vdCorput_sequence(ik,2,x1)
+          call vdCorput_sequence(ik,3,x2)          
+          kx0(ik) = b_l(1,1)*x1 + b_l(1,2)*x2
+          ky0(ik) = b_l(2,1)*x1 + b_l(2,2)*x2
+
+        end do
+      else
+        message(1)= &
+          'Error message: Invarid input; kpoint_sampling_method.'
+        call error_finalize(message(1))
+      end if
 
       kx = kx0
       ky = ky0
@@ -154,7 +206,8 @@ module electronic_system
       call read_basic_input('if_output_kspace_distribution' &
            ,if_output_kspace_distribution,val_default = .true.)
 
-      if(if_output_kspace_distribution)then
+      if(if_output_kspace_distribution .and. &
+        n_kpoint_sampling_method == n_kpoint_sampling_method_uniform)then
 
          allocate(kx_g(nk),ky_g(nk))
          allocate(eps_dist_g(2,nk),occ_dist_g(2,nk))

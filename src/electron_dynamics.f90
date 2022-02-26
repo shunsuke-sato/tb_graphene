@@ -60,7 +60,8 @@ module electron_dynamics
         end if
       end do
 
-      if(if_output_kspace_distribution) &
+      if(if_output_kspace_distribution .and. &
+        n_kpoint_sampling_method == n_kpoint_sampling_method_uniform) &
            call calc_carrier_distribution('final_population_dist.out')
       
       if(if_root_global)then
