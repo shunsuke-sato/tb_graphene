@@ -1,5 +1,5 @@
-nk1 = 4
-nk2 = 4
+kpoint_sampling_method = kpoint_sampling_method_halton
+nk_tot = 16
 
 T1_relax_fs = 100d0
 T2_relax_fs = 20d0
