@@ -75,7 +75,6 @@ module laser
       call read_basic_input('if_oct_input',if_oct_input,val_default = .false.)
       if(if_oct_input)then
          call read_oct_input_parameters
-         return
       end if
 
 ! laser 1
@@ -201,14 +200,14 @@ module laser
       real(8),intent(out) :: Act_x, Act_y
       real(8) :: xx
 
+      Act_x = 0d0
+      Act_y = 0d0
+
 ! OCT laser      
       if(if_oct_input)then
          call calc_vector_potential_time_oct(tt, Act_x, Act_y)
-         return
       end if
 
-      Act_x = 0d0
-      Act_y = 0d0
 
 ! laser 1
       if(if_pulse_1)then
