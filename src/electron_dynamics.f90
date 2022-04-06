@@ -60,6 +60,8 @@ module electron_dynamics
         end if
       end do
 
+
+
       if(if_output_kspace_distribution) &
            call calc_carrier_distribution('final_population_dist.out')
       
@@ -73,6 +75,7 @@ module electron_dynamics
     subroutine init_electron_dynamics
       implicit none
       real(8) :: total_propagation_time_fs
+      integer :: id_file_t
 
       call init_laser
 
@@ -87,9 +90,19 @@ module electron_dynamics
             num_time_step = aint((2d0*pi/omega_oct)/time_step)+1
             num_time_step = max(num_time_step, 1)
             time_step = (2d0*pi/omega_oct)/num_time_step
+
+            call get_newfile_id(id_file_t)
+            open(id_file_t, file='parameter_oct_time.out')
+            write(id_file_t,"(A)")"# time step for single cycle"
+            write(id_file_t,"(I7)")num_time_step
+
             total_propagation_time = total_propagation_time +(2d0*pi/omega_oct)
             num_time_step = aint(total_propagation_time/time_step)+1
 
+            write(id_file_t,"(A)")"# time step for total propagation"
+            write(id_file_t,"(I7)")num_time_step+1
+
+            close(id_file_t)
 
             write(*,"(A,2x,e26.16e3)")'time_step (refined)=',time_step
             write(*,"(A,2x,I9)")'num_time_step            =',num_time_step
