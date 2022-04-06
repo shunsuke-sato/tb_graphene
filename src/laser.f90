@@ -308,14 +308,14 @@ module laser
          if(yy(1,i) /= yy(1,i))yy(1,i)=1d-10
          j = 2*i+2
          yy(2,i) = exp(tan(0.5d0*pi*(2d0*xx_oct(j)-1d0)))
-         if(yy(2,i) /= yy(2,i))yy(1,i)=1d-10
+         if(yy(2,i) /= yy(2,i))yy(2,i)=1d-10
       end do
       ss = sum(yy)
       yy = yy/ss
 
       do i = 0, nmax_oct
          if(yy(1,i) /= yy(1,i))yy(1,i)=0d0
-         if(yy(2,i) /= yy(2,i))yy(1,i)=0d0
+         if(yy(2,i) /= yy(2,i))yy(2,i)=0d0
       end do
 
 
