@@ -74,24 +74,40 @@ module electron_dynamics
       implicit none
       real(8) :: total_propagation_time_fs
 
+      call init_laser
+
       call read_basic_input('total_propagation_time_fs' &
         ,total_propagation_time_fs,val_default = -1.0d0)
       total_propagation_time = total_propagation_time_fs*fs
       call read_basic_input('time_step', time_step,val_default = -1.0d0)
 
       if(if_root_global)then
-        write(*,"(A,2x,e26.16e3)")'time_step (initial)=',time_step
-        num_time_step = aint(total_propagation_time/time_step)+1
-        num_time_step = max(num_time_step, 0)
-        time_step = total_propagation_time/num_time_step
+         if(if_oct_input)then
+            write(*,"(A,2x,e26.16e3)")'time_step (initial)=',time_step
+            num_time_step = aint((2d0*pi/omega_oct)/time_step)+1
+            num_time_step = max(num_time_step, 1)
+            time_step = (2d0*pi/omega_oct)/num_time_step
+            total_propagation_time = total_propagation_time +(2d0*pi/omega_oct)
+            num_time_step = aint(total_propagation_time/time_step)+1
 
-        write(*,"(A,2x,e26.16e3)")'time_step (refined)=',time_step
-        write(*,"(A,2x,I9)")'num_time_step            =',num_time_step
+
+            write(*,"(A,2x,e26.16e3)")'time_step (refined)=',time_step
+            write(*,"(A,2x,I9)")'num_time_step            =',num_time_step
+
+         else
+            write(*,"(A,2x,e26.16e3)")'time_step (initial)=',time_step
+            num_time_step = aint(total_propagation_time/time_step)+1
+            num_time_step = max(num_time_step, 0)
+            time_step = total_propagation_time/num_time_step
+
+            write(*,"(A,2x,e26.16e3)")'time_step (refined)=',time_step
+            write(*,"(A,2x,I9)")'num_time_step            =',num_time_step
+         end if
       end if
       call comm_bcast(time_step)
       call comm_bcast(num_time_step)
 
-      call init_laser
+
 
     end subroutine init_electron_dynamics
 !-------------------------------------------------------------------------------

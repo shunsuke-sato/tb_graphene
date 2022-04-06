@@ -2,6 +2,8 @@ module laser
   use inputoutput
   use math
   use constants
+  use parallel
+  use communication
   implicit none
   private
 
@@ -38,6 +40,14 @@ module laser
   logical :: if_cw_field_1
   real(8) :: E0_cw_1_x, E0_cw_1_y
   real(8) :: omega_cw_1, phi_CEP_cw_1_x, phi_CEP_cw_1_y
+
+! OCT parameters
+  logical,public :: if_oct_input
+  integer, parameter :: nmax_oct = 10
+  integer :: ndim_oct_parameter
+  real(8),allocatable :: xx_oct(:)
+  real(8) :: E0_OCT(2,0:nmax_oct), phi_OCT(2,0:nmax_oct)
+  real(8),public :: omega_OCT
   
   contains
 !-------------------------------------------------------------------------------
@@ -61,7 +71,13 @@ module laser
       real(8) :: E0_cw_1_x_Vm, E0_cw_1_y_Vm
       real(8) :: omega_cw_1_ev, phi_CEP_cw_1_x_2pi, phi_CEP_cw_1_y_2pi
 
-      
+! OCT laser      
+      call read_basic_input('if_oct_input',if_oct_input,val_default = .false.)
+      if(if_oct_input)then
+         call read_oct_input_parameters
+         return
+      end if
+
 ! laser 1
       call read_basic_input('E0_pulse_1_x_Vm',E0_pulse_1_x_Vm,val_default = 0d0)
       call read_basic_input('E0_pulse_1_y_Vm',E0_pulse_1_y_Vm,val_default = 0d0)
@@ -185,6 +201,12 @@ module laser
       real(8),intent(out) :: Act_x, Act_y
       real(8) :: xx
 
+! OCT laser      
+      if(if_oct_input)then
+         call calc_vector_potential_time_oct(tt, Act_x, Act_y)
+         return
+      end if
+
       Act_x = 0d0
       Act_y = 0d0
 
@@ -257,6 +279,84 @@ module laser
 
     end subroutine calc_electric_field_time
 !-------------------------------------------------------------------------------
+    subroutine read_oct_input_parameters
+      implicit none
+      real(8),parameter :: Intensity_max_Wcm2 = 1d14, conv_para = 5.338d-9
+      real(8),parameter :: omega_oct_i = 0.1d0*ev, omega_oct_f = 1.6d0*ev
+      integer :: id_file_t
+      integer :: np
+      real(8) :: yy(2,0:nmax_oct), ss
+      integer :: i,j
+
+      ndim_oct_parameter = 4*nmax_oct+6
+      allocate(xx_oct(ndim_oct_parameter))
+      if(if_root_global)then
+         call get_newfile_id(id_file_t)
+         open(id_file_t,file="OCT_input_parameters.dat")
+         read(id_file_t,*) ! skip header
+         read(id_file_t,*)xx_oct(:)
+         close(id_file_t)
+      end if
+      call comm_bcast(xx_oct)
+
+! Assume 0<xx_oct <1
+
+! for xx(1) to xx(2*nmax_oct+2)
+      yy = 0d0
+      do i = 0, nmax_oct
+         j = 2*i+1
+         yy(1,i) = exp(tan(0.5d0*pi*(2d0*xx_oct(j)-1d0)))
+         if(yy(1,i) /= yy(1,i))yy(1,i)=1d-10
+         j = 2*i+2
+         yy(2,i) = exp(tan(0.5d0*pi*(2d0*xx_oct(j)-1d0)))
+         if(yy(2,i) /= yy(2,i))yy(1,i)=1d-10
+      end do
+      ss = sum(yy)
+      yy = yy/ss
+
+      do i = 0, nmax_oct
+         if(yy(1,i) /= yy(1,i))yy(1,i)=0d0
+         if(yy(2,i) /= yy(2,i))yy(1,i)=0d0
+      end do
+
+
+! for xx(2*nmax_oct+2+1) to xx(2*nmax_oct+2+2*nmax_oct+2); xx(4*nmax_oct+4)
+      do i = 0, nmax_oct
+         j = 2*i+1+2*nmax_oct+2
+         phi_oct(1,i) = 2d0*pi*xx_oct(j)
+         j = 2*i+2+2*nmax_oct+2
+         phi_oct(2,i) = 2d0*pi*xx_oct(j)
+      end do
+
+
+! xx(4*nmax_oct+4+1)      
+      yy = yy*xx_oct(4*nmax_oct+4+1)*Intensity_max_Wcm2
+      E0_OCT(:,:) = conv_para*sqrt(yy)
+
+! xx(4*nmax_oct+6)
+      omega_OCT = omega_oct_i + (omega_oct_f-omega_oct_i)*xx_oct(4*nmax_oct+6)
+
+    end subroutine read_oct_input_parameters
+!-------------------------------------------------------------------------------
+    subroutine calc_vector_potential_time_oct(tt, Act_x, Act_y)
+      implicit none
+      real(8),intent(in) :: tt ! time
+      real(8),intent(out) :: Act_x, Act_y
+      real(8) :: xx, omega_t
+      integer :: i
+
+
+      Act_x = 0d0
+      Act_y = 0d0
+
+
+      do i = 0, nmax_oct
+         omega_t = (2*i+1)*omega_OCT
+         Act_x = Act_x -(E0_OCT(1,i)/omega_t)*real(exp(zi*(omega_t*tt+phi_oct(1,i))))
+         Act_y = Act_y -(E0_OCT(2,i)/omega_t)*real(exp(zi*(omega_t*tt+phi_oct(2,i))))
+      end do
+
+    end subroutine calc_vector_potential_time_oct
 !-------------------------------------------------------------------------------
   
 
