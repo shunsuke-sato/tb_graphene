@@ -335,6 +335,15 @@ module laser
 ! xx(4*nmax_oct+6)
       omega_OCT = omega_oct_i + (omega_oct_f-omega_oct_i)*xx_oct(4*nmax_oct+6)
 
+      if(if_root_global)then
+         write(*,"(A)")"#Laser parameters"
+         write(*,"(A)")"#i, omega (eV), Ex (V/m), Ey (V/m), phi_x, phi_y"
+         do i = 0, nmax_oct
+            write(*,"(I6,999e16.6e3)")i,(2*i+1)*omega_oct/ev &
+                 ,E0_oct(1:2,i)/(ev/(angstrom*1d10)),phi_oct(1:2,i)
+         end do
+      end if
+
     end subroutine read_oct_input_parameters
 !-------------------------------------------------------------------------------
     subroutine calc_vector_potential_time_oct(tt, Act_x, Act_y)
