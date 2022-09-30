@@ -60,6 +60,7 @@ module electronic_system
       real(8) :: Eelec_t
       real(8),allocatable :: kx_g(:),ky_g(:)
       real(8),allocatable :: eps_dist_g(:,:),occ_dist_g(:,:)
+      real(8) :: omega_tcd_ev
 
 ! set prameters
 
@@ -203,8 +204,9 @@ module electronic_system
       call read_basic_input('if_calc_transition_current_density' &
            ,if_calc_transition_current_density,val_default = .false.)
 
-      call read_basic_input('omega_tcd' &
-           ,omega_tcd,val_default = 0d0)
+      call read_basic_input('omega_tcd_ev' &
+           ,omega_tcd_ev,val_default = 0d0)
+      omega_tcd = omega_tcd_ev*ev
 
       if(if_calc_transition_current_density)then
         allocate(zjxy_tcd(0:nk1-1,0:nk2-1,2))
