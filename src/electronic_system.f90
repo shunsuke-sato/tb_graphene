@@ -692,8 +692,11 @@ module electronic_system
         ss = sum(ww)
         ww = ww/ss
 
+
+        if(n1 >= nk1)n1 = n1-nk1
+        if(n2 >= nk2)n2 = n2-nk2
         if(n1_p >= nk1)n1_p = n1_p-nk1
-        if(n2_p >= nk1)n2_p = n2_p-nk2
+        if(n2_p >= nk2)n2_p = n2_p-nk2
 
         zjxy_tcd(n1,n2,:) = zjxy_tcd(n1,n2,:) + ww(0,0)*jxy_t(:)*exp(zi*omega_tcd*time_t)
         zjxy_tcd(n1_p,n2,:) = zjxy_tcd(n1_p,n2,:) + ww(1,0)*jxy_t(:)*exp(zi*omega_tcd*time_t)
