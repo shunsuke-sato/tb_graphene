@@ -14,7 +14,10 @@ module electronic_system
            ,zfk_tb &
            ,calc_current_elec_system &
            ,calc_energy_elec_system &
-           ,calc_carrier_distribution
+           ,calc_carrier_distribution &
+           ,integrate_transition_current_density &
+           ,output_transition_current_density
+
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
 
@@ -42,6 +45,11 @@ module electronic_system
 
   logical,public :: if_output_kspace_distribution
 
+! transition current density
+  logical,public :: if_calc_transition_current_density
+  complex(8),allocatable :: zjxy_tcd(:,:,:)
+  real(8) :: omega_tcd
+
   contains
 !-------------------------------------------------------------------------------
     subroutine init_elec_system
@@ -52,6 +60,7 @@ module electronic_system
       real(8) :: Eelec_t
       real(8),allocatable :: kx_g(:),ky_g(:)
       real(8),allocatable :: eps_dist_g(:,:),occ_dist_g(:,:)
+      real(8) :: omega_tcd_ev
 
 ! set prameters
 
@@ -191,6 +200,19 @@ module electronic_system
         write(*,"(A,2x,e26.16e3,2x,A)")'The initial electronic energy is ',Eelec_t,"a.u."
         write(*,"(A,2x,e26.16e3,2x,A)")'The initial electronic energy is ',Eelec_t/ev*1d3,"meV."
       end if
+
+      call read_basic_input('if_calc_transition_current_density' &
+           ,if_calc_transition_current_density,val_default = .false.)
+
+      call read_basic_input('omega_tcd_ev' &
+           ,omega_tcd_ev,val_default = 0d0)
+      omega_tcd = omega_tcd_ev*ev
+
+      if(if_calc_transition_current_density)then
+        allocate(zjxy_tcd(0:nk1-1,0:nk2-1,2))
+        zjxy_tcd = 0d0
+      end if
+
       
     end subroutine init_elec_system
 !-------------------------------------------------------------------------------
@@ -607,7 +629,114 @@ module electronic_system
       
     end subroutine calc_carrier_distribution
 !-------------------------------------------------------------------------------
+    subroutine integrate_transition_current_density(time_t)
+      implicit none
+      real(8),intent(in) :: time_t
+      real(8) :: kx_t, ky_t, k1_t, k2_t
+      real(8) :: x1,x2
+      integer :: ik
+      complex(8) :: zjx_op(2,2), zjy_op(2,2)
+      complex(8) :: zdfk_dk(2), zmat_tmp(2,2)
+      real(8) :: jxy_t(2)
+      real(8) :: Binv(2,2), detB
+      integer :: n1, n2, n1_p, n2_p
+      real(8) :: dx1, dx2
+      real(8) :: ww(0:1,0:1), ss
+
+      detB = b_l(1,1)*b_l(2,2)-b_l(1,2)*b_l(2,1)
+      Binv(1,1) = b_l(2,2)
+      Binv(2,2) = b_l(1,1)
+      Binv(1,2) = -b_l(1,2)
+      Binv(2,1) = -b_l(2,1)
+      Binv = Binv/detB
+
+      do ik = nk_start, nk_end
+        kx_t = kx(ik)
+        ky_t = ky(ik)
+
+        zdfk_dk(:) = zdfk_dk_tb(kx_t, ky_t)
+        zjx_op(1,2) = t_hop*zdfk_dk(1) ! *(-1)*(-1)
+        zjx_op(2,1) = conjg(zjx_op(1,2))
+
+        zjy_op(1,2) = t_hop*zdfk_dk(2) ! *(-1)*(-1)
+        zjy_op(2,1) = conjg(zjy_op(1,2))
+
+        zmat_tmp = matmul(zjx_op,zrho_dm(:,:,ik))
+        jxy_t(1) = zmat_tmp(1,1)+ zmat_tmp(2,2)
+
+        zmat_tmp = matmul(zjy_op,zrho_dm(:,:,ik))
+        jxy_t(2) = zmat_tmp(1,1)+ zmat_tmp(2,2)
+
+        k1_t = Binv(1,1)*kx_t +Binv(1,2)*ky_t
+        k2_t = Binv(2,1)*kx_t +Binv(2,2)*ky_t
+
+        x1 = k1_t - int(k1_t)
+        x2 = k2_t - int(k2_t)
+
+        if(x1 < 0d0)x1 = x1+1d0
+        if(x2 < 0d0)x2 = x2+1d0
+
+        x1 = x1*nk1
+        x2 = x2*nk2
+
+        n1 = x1
+        n2 = x2
+
+        n1_p = n1 +1
+        n2_p = n2 +1
+
+        ww(0,0) = 1d0/(dble(x1-n1)**2 + dble(x2-n2)**2 + 1d-6)
+        ww(1,0) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2)**2 + 1d-6)
+        ww(0,1) = 1d0/(dble(x1-n1)**2 + dble(x2-n2_p)**2 + 1d-6)
+        ww(1,1) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2_p)**2 + 1d-6)
+        ss = sum(ww)
+        ww = ww/ss
+
+
+        if(n1 >= nk1)n1 = n1-nk1
+        if(n2 >= nk2)n2 = n2-nk2
+        if(n1_p >= nk1)n1_p = n1_p-nk1
+        if(n2_p >= nk2)n2_p = n2_p-nk2
+
+        zjxy_tcd(n1,n2,:) = zjxy_tcd(n1,n2,:) + ww(0,0)*jxy_t(:)*exp(zi*omega_tcd*time_t)
+        zjxy_tcd(n1_p,n2,:) = zjxy_tcd(n1_p,n2,:) + ww(1,0)*jxy_t(:)*exp(zi*omega_tcd*time_t)
+        zjxy_tcd(n1,n2_p,:) = zjxy_tcd(n1,n2_p,:) + ww(0,1)*jxy_t(:)*exp(zi*omega_tcd*time_t)
+        zjxy_tcd(n1_p,n2_p,:) = zjxy_tcd(n1_p,n2_p,:) + ww(1,1)*jxy_t(:)*exp(zi*omega_tcd*time_t)
+
+        
+      end do
+
+
+    end subroutine integrate_transition_current_density
 !-------------------------------------------------------------------------------
+    subroutine output_transition_current_density
+      implicit none
+      integer ::ik1, ik2
+      real(8) :: kx_t, ky_t
+      integer :: id_file_t
+
+      call comm_allreduce(zjxy_tcd)
+      zjxy_tcd = zjxy_tcd*2d0/(2d0*pi)**2
+
+      if(if_root_global)then
+        call get_newfile_id(id_file_t)
+        open(id_file_t,file="transition_current_density.out")
+        write(id_file_t,"(A,2x,999e26.16e3)")"# omega_tcd=",omega_tcd
+
+        do ik1 = 0, nk1-1
+          do ik2 = 0, nk2-1
+
+            kx_t = b_l(1,1)*ik1/dble(nk1) + b_l(1,2)*ik2/dble(nk2)
+            ky_t = b_l(2,1)*ik1/dble(nk1) + b_l(2,2)*ik2/dble(nk2)
+
+            write(id_file_t,"(999e26.16e3)")kx_t, ky_t, zjxy_tcd(ik1,ik2,:)
+          end do
+          write(id_file_t,*)
+        end do
+        close(id_file_t)
+      end if
+
+    end subroutine output_transition_current_density
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------
 !-------------------------------------------------------------------------------

@@ -31,6 +31,9 @@ module electron_dynamics
       kx = kx0 + Act_x; ky = ky0 + Act_y
       call calc_current_elec_system(jxy_t, jxy_intra_c_t, jxy_intra_v_t)
       call calc_energy_elec_system(Eelec_t)
+      if(if_calc_transition_current_density)then
+        call integrate_transition_current_density(0d0)
+      end if
 
       if(if_root_global)then
         call get_newfile_id(id_file_current)
@@ -53,6 +56,11 @@ module electron_dynamics
         kx = kx0 + Act_x; ky = ky0 + Act_y
         call calc_current_elec_system(jxy_t, jxy_intra_c_t, jxy_intra_v_t)
         call calc_energy_elec_system(Eelec_t)
+
+        if(if_calc_transition_current_density)then
+          call integrate_transition_current_density(tt)
+        end if
+
         if(if_root_global)then
           write(id_file_current,"(999e26.16e3)")tt,jxy_t(:),act_x,act_y,Et_x,Et_y &
             ,jxy_intra_c_t(:)+jxy_intra_v_t(:),jxy_intra_c_t(:),jxy_intra_v_t(:)
@@ -66,6 +74,10 @@ module electron_dynamics
       if(if_root_global)then
         close(id_file_current)
         close(id_file_energy)
+      end if
+
+      if(if_calc_transition_current_density)then
+        call output_transition_current_density
       end if
 
     end subroutine calc_electron_dynamics

@@ -19,3 +19,5 @@ E0_dc_x_Vm = 1d6
 E0_cw_1_x_Vm = 1d6
 omega_cw_1_ev = 1.55d0
 
+if_calc_transition_current_density = y
+omega_tcd_ev = 1.55d0
