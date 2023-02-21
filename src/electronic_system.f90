@@ -50,6 +50,10 @@ module electronic_system
   complex(8),allocatable :: zjxy_tcd(:,:,:)
   real(8) :: omega_tcd
 
+! given reference population distribution
+  logical,public :: if_output_final_population_dist
+  real(8),allocatable :: occ_dist_ref(:,:)
+
   contains
 !-------------------------------------------------------------------------------
     subroutine init_elec_system
@@ -212,6 +216,11 @@ module electronic_system
         allocate(zjxy_tcd(0:nk1-1,0:nk2-1,2))
         zjxy_tcd = 0d0
       end if
+
+      call read_basic_input('if_output_final_population_dist' &
+          ,if_output_final_population_dist,val_default = .false.)
+
+
 
       
     end subroutine init_elec_system
@@ -628,6 +637,95 @@ module electronic_system
       end if
       
     end subroutine calc_carrier_distribution
+!-------------------------------------------------------------------------------
+    subroutine read_carrier_distribution_for_reference
+      implicit none
+      real(8),allocatable :: kx_g_t(:),ky_g_t(:)
+      real(8),allocatable :: occ_dist_ref_t(:,:)
+      real(8) :: ss_t(2)
+      integer :: id_file_t, ik
+      real(8) :: Binv(2,2), detB
+      real(8) :: k1_t, k2_t, x1,x2
+      integer :: n1, n2, n1_p, n2_p
+      real(8) :: dx1, dx2
+      real(8) :: ww(0:1,0:1), ss
+
+      detB = b_l(1,1)*b_l(2,2)-b_l(1,2)*b_l(2,1)
+      Binv(1,1) = b_l(2,2)
+      Binv(2,2) = b_l(1,1)
+      Binv(1,2) = -b_l(1,2)
+      Binv(2,1) = -b_l(2,1)
+      Binv = Binv/detB
+
+      allocate(occ_dist_ref(2,nk))
+      occ_dist_ref = 0d0
+
+      if(if_global)then
+        allocate(occ_dist_ref_t(2,nk), kx_g_t(nk), ky_g_t(nk))
+
+        call get_newfile_id(id_file_t)
+        open(id_file_t,file='reference_population_dist.out')
+        read(id_file_t,*)
+        do ik = 1, nk
+          read(id_file_t,*)kx_g_t(ik),ky_g_t(ik),ss_t(1:2),occ_dist_ref_t(1:2,ik)
+        end do
+        close(id_file_t)
+
+
+
+        do ik = 1, nk
+
+          k1_t = Binv(1,1)*kx_g_t(ik) +Binv(1,2)*ky_g_t(ik)
+          k2_t = Binv(2,1)*kx_g_t(ik) +Binv(2,2)*ky_g_t(ik)
+
+          x1 = k1_t - int(k1_t)
+          x2 = k2_t - int(k2_t)
+
+          if(x1 < 0d0)x1 = x1+1d0
+          if(x2 < 0d0)x2 = x2+1d0
+
+          x1 = x1*nk1
+          x2 = x2*nk2
+
+          n1 = x1
+          n2 = x2
+
+          n1_p = n1 +1
+          n2_p = n2 +1
+
+          ww(0,0) = 1d0/(dble(x1-n1)**2 + dble(x2-n2)**2 + 1d-6)
+          ww(1,0) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2)**2 + 1d-6)
+          ww(0,1) = 1d0/(dble(x1-n1)**2 + dble(x2-n2_p)**2 + 1d-6)
+          ww(1,1) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2_p)**2 + 1d-6)
+          ss = sum(ww)
+          ww = ww/ss
+
+
+          if(n1 >= nk1)n1 = n1-nk1
+          if(n2 >= nk2)n2 = n2-nk2
+          if(n1_p >= nk1)n1_p = n1_p-nk1
+          if(n2_p >= nk2)n2_p = n2_p-nk2
+
+          occ_dist_ref(:,ik_table(n1,n2)) = occ_dist_ref(:,ik_table(n1,n2)) &
+              + ww(0,0)*occ_dist_ref_t(1:2,ik)
+
+          occ_dist_ref(:,ik_table(n1_p,n2)) = occ_dist_ref(:,ik_table(n1_p,n2)) &
+              + ww(1,0)*occ_dist_ref_t(1:2,ik)
+
+          occ_dist_ref(:,ik_table(n1,n2_p)) = occ_dist_ref(:,ik_table(n1,n2_p)) &
+              + ww(0,1)*occ_dist_ref_t(1:2,ik)
+
+          occ_dist_ref(:,ik_table(n1_p,n2_p)) = occ_dist_ref(:,ik_table(n1_p,n2_p)) &
+              + ww(1,1)*occ_dist_ref_t(1:2,ik)
+
+
+        end do
+      end if
+
+
+      call comm_bcast(occ_dist_ref)
+
+    end subroutine read_carrier_distribution_for_reference
 !-------------------------------------------------------------------------------
     subroutine integrate_transition_current_density(time_t)
       implicit none

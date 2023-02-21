@@ -68,7 +68,7 @@ module electron_dynamics
         end if
       end do
 
-      if(if_output_kspace_distribution) &
+      if(if_output_kspace_distribution .and. if_output_final_population_dist) &
            call calc_carrier_distribution('final_population_dist.out')
       
       if(if_root_global)then
