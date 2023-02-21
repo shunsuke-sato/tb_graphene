@@ -166,6 +166,16 @@ module electronic_system
       kx = kx0
       ky = ky0
 
+      call read_basic_input('if_use_reference_population_dist' &
+          ,if_use_reference_population_dist,val_default = .false.)
+
+      if(if_use_reference_population_dist)then
+        allocate(occ_dist_ref_t(2,nk_start:nk_end))
+        allocate(occ_dist_ref_t_dt_half(2,nk_start:nk_end))
+        allocate(occ_dist_ref_t_dt(2,nk_start:nk_end))
+        call read_carrier_distribution_for_reference
+      end if
+
       call initialize_density_matrix
 
       call read_basic_input('if_output_kspace_distribution' &
@@ -224,15 +234,6 @@ module electronic_system
       call read_basic_input('if_output_final_population_dist' &
           ,if_output_final_population_dist,val_default = .false.)
 
-      call read_basic_input('if_use_reference_population_dist' &
-          ,if_use_reference_population_dist,val_default = .false.)
-
-      if(if_use_reference_population_dist)then
-        allocate(occ_dist_ref_t(2,nk_start:nk_end))
-        allocate(occ_dist_ref_t_dt_half(2,nk_start:nk_end))
-        allocate(occ_dist_ref_t_dt(2,nk_start:nk_end))
-        call read_carrier_distribution_for_reference
-      end if
 
 
 
@@ -258,8 +259,13 @@ module electronic_system
         zfk_t = zfk_tb(kx_t, ky_t)
         zalpha = -t_hop*zfk_t
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
-        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
-        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        if(if_use_reference_population_dist)then
+          occ(:) = occ_dist_ref(:,ik)
+        else
+          occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+          occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        end if
+
 
         zrho_dm(1,1, ik) = occ(1)*abs(zeigv(1,1))**2 &
                          + occ(2)*abs(zeigv(1,2))**2

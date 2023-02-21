@@ -148,8 +148,12 @@ module electron_dynamics
         zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
-        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
-        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        if(if_use_reference_population_dist)then
+          occ(:) = occ_dist_ref_t(:,ik)
+        else
+          occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+          occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        end if
 
 ! transform to instantaneous eigen basis
         zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
@@ -174,8 +178,12 @@ module electron_dynamics
         zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
-        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
-        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        if(if_use_reference_population_dist)then
+          occ(:) = occ_dist_ref_t_dt_half(:,ik)
+        else
+          occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+          occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        end if
 ! transform to instantaneous eigen basis
         zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
         zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
@@ -200,8 +208,12 @@ module electron_dynamics
         zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
-        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
-        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        if(if_use_reference_population_dist)then
+          occ(:) = occ_dist_ref_t_dt_half(:,ik)
+        else
+          occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+          occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        end if
 ! transform to instantaneous eigen basis
         zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
         zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
@@ -226,8 +238,12 @@ module electron_dynamics
         zLrho_dm_t = -zi*zLrho_dm_t
 
         call calc_eigv_2x2_gra(zalpha, zeigv, eig)
-        occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
-        occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        if(if_use_reference_population_dist)then
+          occ(:) = occ_dist_ref_t_dt(:,ik)
+        else
+          occ(1) = Fermi_Dirac_distribution(eig(1), mu_F, kbT)
+          occ(2) = Fermi_Dirac_distribution(eig(2), mu_F, kbT)
+        end if
 ! transform to instantaneous eigen basis
         zrho_col = matmul( transpose(conjg(zeigv)),  matmul(zrho_dm_t, zeigv))
         zrho_col(1,1) = -(zrho_col(1,1)-occ(1))/T1_relax
