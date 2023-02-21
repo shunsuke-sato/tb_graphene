@@ -16,7 +16,8 @@ module electronic_system
            ,calc_energy_elec_system &
            ,calc_carrier_distribution &
            ,integrate_transition_current_density &
-           ,output_transition_current_density
+           ,output_transition_current_density &
+           ,prepare_reference_population_dist
 
 
 ! parameters are given by Rev. Mod. Phys. 81 109, (2009).
@@ -680,7 +681,7 @@ module electronic_system
       allocate(occ_dist_ref(2,nk))
       occ_dist_ref = 0d0
 
-      if(if_global)then
+      if(if_root_global)then
         allocate(occ_dist_ref_t(2,nk), kx_g_t(nk), ky_g_t(nk))
 
         call get_newfile_id(id_file_t)
@@ -754,6 +755,7 @@ module electronic_system
       real(8) :: kx_t, ky_t
       real(8) :: Binv(2,2), detB
       real(8) :: k1_t, k2_t, x1,x2
+      integer :: ik
       integer :: n1, n2, n1_p, n2_p
       real(8) :: dx1, dx2
       real(8) :: ww(0:1,0:1), ss
