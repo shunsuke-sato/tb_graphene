@@ -52,7 +52,11 @@ module electronic_system
 
 ! given reference population distribution
   logical,public :: if_output_final_population_dist
-  real(8),allocatable :: occ_dist_ref(:,:)
+  logical,public :: if_use_reference_population_dist
+  real(8),allocatable,public :: occ_dist_ref(:,:)
+  real(8),allocatable,public :: occ_dist_ref_t(:,:),occ_dist_ref_t_dt_half(:,:)
+  real(8),allocatable,public :: occ_dist_ref_t_dt(:,:)
+
 
   contains
 !-------------------------------------------------------------------------------
@@ -219,6 +223,16 @@ module electronic_system
 
       call read_basic_input('if_output_final_population_dist' &
           ,if_output_final_population_dist,val_default = .false.)
+
+      call read_basic_input('if_use_reference_population_dist' &
+          ,if_use_reference_population_dist,val_default = .false.)
+
+      if(if_use_reference_population_dist)then
+        allocate(occ_dist_ref_t(2,nk_start:nk_end))
+        allocate(occ_dist_ref_t_dt_half(2,nk_start:nk_end))
+        allocate(occ_dist_ref_t_dt(2,nk_start:nk_end))
+        call read_carrier_distribution_for_reference
+      end if
 
 
 
@@ -726,6 +740,67 @@ module electronic_system
       call comm_bcast(occ_dist_ref)
 
     end subroutine read_carrier_distribution_for_reference
+!-------------------------------------------------------------------------------
+    subroutine prepare_reference_population_dist(act_x_in, act_y_in, occ_dist_ref_out)
+      implicit none
+      real(8),intent(in) :: act_x_in, act_y_in
+      real(8),intent(out) :: occ_dist_ref_out(2,nk_start:nk_end)
+      real(8) :: kx_t, ky_t
+      real(8) :: Binv(2,2), detB
+      real(8) :: k1_t, k2_t, x1,x2
+      integer :: n1, n2, n1_p, n2_p
+      real(8) :: dx1, dx2
+      real(8) :: ww(0:1,0:1), ss
+
+      detB = b_l(1,1)*b_l(2,2)-b_l(1,2)*b_l(2,1)
+      Binv(1,1) = b_l(2,2)
+      Binv(2,2) = b_l(1,1)
+      Binv(1,2) = -b_l(1,2)
+      Binv(2,1) = -b_l(2,1)
+      Binv = Binv/detB
+
+      occ_dist_ref_out = 0d0
+
+      do ik = nk_start, nk_end
+        kx_t = kx0(ik) + act_x_in
+        ky_t = ky0(ik) + act_y_in
+
+
+        k1_t = Binv(1,1)*kx_t +Binv(1,2)*ky_t
+        k2_t = Binv(2,1)*kx_t +Binv(2,2)*ky_t
+
+        x1 = k1_t - int(k1_t)
+        x2 = k2_t - int(k2_t)
+
+        if(x1 < 0d0)x1 = x1+1d0
+        if(x2 < 0d0)x2 = x2+1d0
+
+        x1 = x1*nk1
+        x2 = x2*nk2
+
+        n1 = x1
+        n2 = x2
+
+        n1_p = n1 +1
+        n2_p = n2 +1
+
+        ww(0,0) = 1d0/(dble(x1-n1)**2 + dble(x2-n2)**2 + 1d-6)
+        ww(1,0) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2)**2 + 1d-6)
+        ww(0,1) = 1d0/(dble(x1-n1)**2 + dble(x2-n2_p)**2 + 1d-6)
+        ww(1,1) = 1d0/(dble(x1-n1_p)**2 + dble(x2-n2_p)**2 + 1d-6)
+        ss = sum(ww)
+        ww = ww/ss
+
+
+        occ_dist_ref_out(:,ik) = ww(0,0)*occ_dist_ref(:,ik_table(n1,n2)) &
+                                +ww(1,0)*occ_dist_ref(:,ik_table(n1_p,n2)) &
+                                +ww(0,1)*occ_dist_ref(:,ik_table(n1,n2_p)) &
+                                +ww(1,1)*occ_dist_ref(:,ik_table(n1_p,n2_p))
+
+      end do
+
+
+    end subroutine prepare_reference_population_dist
 !-------------------------------------------------------------------------------
     subroutine integrate_transition_current_density(time_t)
       implicit none

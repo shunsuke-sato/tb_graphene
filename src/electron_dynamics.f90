@@ -120,6 +120,20 @@ module electron_dynamics
       complex(8) :: zeigv(2,2)
       real(8) :: eig(2), occ(2)
 
+      if(if_use_reference_population_dist)then
+        tt = it*time_step
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        call prepare_reference_population_dist(Act_x, Act_y, occ_dist_ref_t)
+
+        tt = it*time_step +0.5d0*time_step
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        call prepare_reference_population_dist(Act_x, Act_y, occ_dist_ref_t_dt_half)
+
+        tt = it*time_step +time_step
+        call calc_vector_potential_time(tt, Act_x, Act_y)
+        call prepare_reference_population_dist(Act_x, Act_y, occ_dist_ref_t_dt)
+      end if
+
       do ik = nk_start, nk_end
 ! RK1
         tt = it*time_step
